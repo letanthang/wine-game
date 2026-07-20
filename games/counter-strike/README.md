@@ -1,112 +1,89 @@
-# Counter-Strike 1.6 (standalone, non-Steam)
+# Counter-Strike 1.6 (standalone, native via Xash3D)
 
-- **Prefix:** `~/wine-prefixes/counter-strike` (plain Wine, 64-bit)
-- **Distribution:** your own standalone installer or game folder (no Steam)
-- **Engine:** GoldSrc (OpenGL) — runs well under plain Wine on Apple Silicon.
+- **Runs via:** Xash3D FWGS engine, **native Apple Silicon arm64 — no Wine**
+- **Install location:** `~/Games/cs16`
+- **Client/bots:** CS16Client (arm64) + bundled YaPB bots for offline play
+- **Assets:** extracted from the user's CS 1.6 WaRzOnE installer
 - **Fonts/locale:** none needed.
 
-This is the non-Steam variant. For the Steam edition (runs via a Sikarugir
-wrapper because the Steam client does not work under plain Wine), see
-`games/steam-counter-strike/`.
+For the Steam edition (Sikarugir wrapper), see `games/steam-counter-strike/`.
 
-> **Warning:** non-Steam CS 1.6 builds circulating online are unofficial and
-> frequently bundle malware/miners — and Wine exposes your whole disk to the
-> game as drive `Z:`. Only use an installer you trust. Also mind licensing:
-> the clean way to own CS 1.6 is the Steam release.
+## Why not Wine (post-mortem, 2026-07-20)
 
-## Setup
+Every Wine variant on this machine crashes the GoldSrc engine a few seconds
+after launch with `err:seh:NtRaiseException Exception frame is not in stack
+limits`:
 
-### 1. Create the prefix
+- wine-stable 11.0 (new WoW64), plain and with `-windowed`, and inside a
+  virtual desktop;
+- Game Porting Toolkit 3.0 (CrossOver-based 32on64) — same error plus a
+  `virtual.c` assertion;
+- two different game builds (a modded nitro_api build and clean WaRzOnE).
+
+Root cause: the GoldSrc engine switches to its own allocated stack and raises
+SEH exceptions from it. True 32-bit Wine (Linux multiarch) tolerates this,
+but both macOS 32-on-64 approaches validate exception frames against the
+thread's original stack limits and refuse to dispatch. Conclusion: **GoldSrc
+does not run under Wine on modern macOS — use the native engine instead.**
+
+## Setup (how ~/Games/cs16 was assembled)
+
+1. Engine — Xash3D FWGS macOS arm64 build:
+   <https://github.com/FWGS/xash3d-fwgs/releases> (`continuous` tag,
+   `xash3d-fwgs-apple-arm64.tar.xz`), extracted into `~/Games/cs16`.
+2. CS client — CS16Client macOS arm64:
+   <https://github.com/Velaron/cs16-client/releases>
+   (`CS16Client-macOS-arm64.zip`), unzipped over the same dir (provides
+   `cstrike/cl_dlls/client_arm64.dylib`, `dlls/cs_arm64.dylib`, YaPB bots).
+3. Game assets — `valve/` and `cstrike/` folders copied from the WaRzOnE
+   install (itself unpacked with `innoextract`, see git history), *without*
+   overwriting the arm64 dylibs (`cp -Rn`).
+
+## Play
 
 ```sh
-make prefix GAME=counter-strike
+games/counter-strike/run.sh            # extra args pass through
 ```
 
-### 2. Install the game
-
-Either run your installer inside the prefix:
-
-```sh
-WINEPREFIX=~/wine-prefixes/counter-strike wine /path/to/cs16-setup.exe
-```
-
-...or copy an existing game folder straight into the prefix, e.g. to
-`~/wine-prefixes/counter-strike/drive_c/Games/Counter-Strike 1.6/`.
-
-### 3. Play
-
-```sh
-games/counter-strike/run.sh
-```
-
-Adjust `GAME_EXE` at the top of `run.sh` to wherever `hl.exe` ended up.
+Runs `./xash3d -game cstrike` from `~/Games/cs16`. Add `-windowed` for
+windowed mode. Offline bots: create a server and YaPB adds bots (see YaPB
+docs for commands, default `yb add`).
 
 ## Troubleshooting
 
-### Installer fails with `Cannot Import dll: ...ISSkinU.dll`
+### "Create Server" is greyed out in the LAN menu
 
-The installer is a *skinned* Inno Setup build; its skin DLL often fails to
-load under Wine. Bypass the skinned UI by installing silently (hit 2026-07-20,
-fixed this way):
+The WaRzOnE build's `cstrike/liblist.gam` points `gamedll` at
+`addons\metamod\dlls\metamod.dll` — a Windows x86 DLL. The native arm64
+engine can't load it, so the server-side game module fails to initialize and
+hosting is disabled (fixed 2026-07-20). Verified via a dedicated-server test
+(`./xash3d -dedicated -game cstrike -dev 3 +map de_dust2`) which loaded fully
+and only failed on `bind: Address already in use` — i.e. the gamedll itself
+loaded fine.
 
-```sh
-WINEPREFIX=~/wine-prefixes/counter-strike wine /path/to/cs16-setup.exe \
-  /VERYSILENT /NORESTART /DIR="C:\Games\Counter-Strike 1.6"
+Fix: edit `~/Games/cs16/cstrike/liblist.gam`, change
+
+```
+gamedll "addons\metamod\dlls\metamod.dll"
 ```
 
-(`/SILENT` shows a progress bar instead; `/DIR` matches the `GAME_EXE` path
-expected by `run.sh`.) If silent mode still fails, install the runtimes the
-skin DLL needs and retry normally:
+to
 
-```sh
-WINEPREFIX=~/wine-prefixes/counter-strike winetricks -q vcrun6 mfc42
+```
+gamedll "dlls\cs.dll"
 ```
 
-### Installer crashes with `virtual_setup_exception stack overflow ... addr 0x0`
-
-The 32-bit installer itself crashes under Wine 11's WoW64 (hit 2026-07-20,
-even in silent mode). Don't run the installer at all — unpack it natively
-with **innoextract** (`brew install innoextract`) and copy the payload in:
-
-```sh
-innoextract -s /path/to/CS16_Setup.exe -d /tmp/cs16   # game lands in /tmp/cs16/app
-mv /tmp/cs16/app \
-  ~/wine-prefixes/counter-strike/drive_c/Games/"Counter-Strike 1.6"
-```
-
-This is how the game was actually installed on this machine. Note: this build
-ships `cstrike.exe` as its launcher (no classic `hl.exe`); `run.sh` points at
-it.
-
-### Game crashes at startup: `nested exception on signal stack` / `Exception frame is not in stack limits`
-
-This modded build (nitro_api engine hooks) crashes a few seconds after launch
-when driving the real display — `-windowed` does not help. Running it inside a
-**Wine virtual desktop** fixes it (verified 2026-07-20):
-
-```sh
-wine explorer /desktop=cs16,1600x900 cstrike.exe
-```
-
-`run.sh` does this by default; change `DESKTOP_SIZE` there to resize.
-
-### `Cannot Import dll: tier0.dll` for `cstrike_new.exe`
-
-This build's `cstrike.exe` is a **self-updating launcher**: on start it
-downloads updates (e.g. `cstrike_new.exe`) into the *current working
-directory* and runs them from there. If you launch the game from any other
-directory, the updated exe lands away from the game's DLLs and fails to load.
-`run.sh` handles this by `cd`-ing into the game dir first (fixed 2026-07-20).
-The launcher also phones an update server on every start; expect harmless
-`winsock`/`secur32` fixme spam in the log.
+(original backed up as `liblist.gam.orig-with-metamod`). This bypasses
+Metamod and AMX Mod X — both are Windows x86 DLLs too and won't load on the
+native arm64 engine, so admin/stats plugins from the WaRzOnE build are lost
+along with them. A working Metamod/AMXX build compatible with Xash3D FWGS
+would need to be sourced separately if those are needed later.
 
 ## Notes
 
-- Multiplayer: non-Steam clients cannot join Steam-authenticated/VAC servers;
-  they work on community servers running Reunion/dproto and on LAN
-  (`sv_lan 1`). Make sure the build speaks **protocol 48** or servers will
-  reject it as outdated.
-- If the mouse feels off, enable "Raw Input" in CS options, or
-  `WINEPREFIX=~/wine-prefixes/counter-strike winecfg` → Graphics →
-  "Automatically capture the mouse in full-screen windows".
-- Performance: GoldSrc is OpenGL; expect smooth 60+ fps on the M4.
+- Native arm64: no Rosetta, no Wine — best possible performance and battery.
+- Multiplayer: Xash3D FWGS speaks the GoldSrc protocol 48 well enough for
+  most community servers, but some servers with strict anti-cheat may reject
+  non-GoldSrc clients. LAN play with other Xash3D clients works fine.
+- Updating: re-download the two archives (engine + client) and re-extract;
+  assets don't change.

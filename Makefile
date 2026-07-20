@@ -1,10 +1,18 @@
 # Wine setup helpers. See README.md for details.
 
-.PHONY: install prefix
+.PHONY: install prefix counter-strike
 
 # Install Wine (Gcenx build), winetricks, and PATH setup in one shot
 install:
 	zsh scripts/install.sh
+
+# Launch Counter-Strike 1.6 (native Xash3D build, see games/counter-strike/).
+# Usage:
+#   make counter-strike
+#   make counter-strike ARGS="-windowed"
+#   make counter-strike ARGS="-dedicated"   # headless server, no client
+counter-strike:
+	games/counter-strike/run.sh $(ARGS)
 
 # Create a 64-bit Wine prefix for a game under ~/wine-prefixes/<GAME>.
 # Usage:
