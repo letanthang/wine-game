@@ -1,0 +1,111 @@
+2026-07-20 13:00:33,139 INFO [launcher] -----------------------------------------------
+2026-07-20 13:00:33,141 INFO [launcher] Start "cstrike.exe"
+2026-07-20 13:00:33,141 INFO [launcher] Version: 2.3.6
+2026-07-20 13:00:33,143 INFO [launcher] Finishing launcher update
+2026-07-20 13:00:33,143 INFO [launcher] Finishing launcher update: nothing to do
+2026-07-20 13:00:33,148 INFO [launcher] Branch: main
+2026-07-20 13:00:33,162 INFO [launcher] Start the Updater GUI App
+2026-07-20 13:00:33,240 INFO [launcher] Requesting remote config from server
+2026-07-20 13:00:33,854 INFO [launcher] Requesting remote config from server error: Remote config deserialization exception
+2026-07-20 13:00:33,854 INFO [launcher] Restoring from backup
+2026-07-20 13:00:33,855 INFO [launcher]   nothing to do
+2026-07-20 13:00:33,855 INFO [launcher] Clearing backup folder
+2026-07-20 13:00:33,855 INFO [launcher] Requesting file list from server
+2026-07-20 13:00:34,356 INFO [launcher] Gathering files that need to be updated
+2026-07-20 13:00:34,358 INFO [launcher]   files to update:
+2026-07-20 13:00:34,358 INFO [launcher]   next_lib.dll
+2026-07-20 13:00:34,358 INFO [launcher]   steam_api.dll
+2026-07-20 13:00:34,358 INFO [launcher]   cstrike\resource\OptionsSubMultiplayer.res
+2026-07-20 13:00:34,358 INFO [launcher]   SDL2.dll
+2026-07-20 13:00:34,358 INFO [launcher]   platform\servers\InternetGamesPage.res
+2026-07-20 13:00:34,358 INFO [launcher]   next_engine_mini.dll
+2026-07-20 13:00:34,358 INFO [launcher]   cstrike\cl_dlls\client_mini.dll
+2026-07-20 13:00:34,358 INFO [launcher]   nitro_api2.dll
+2026-07-20 13:00:34,358 INFO [launcher]   cstrike\gfx\vgui2\800cornerborder_half1.tga
+2026-07-20 13:00:34,358 INFO [launcher]   valve\resource\valve_russian.txt
+2026-07-20 13:00:34,358 INFO [launcher]   FileSystem_Proxy.dll
+2026-07-20 13:00:34,358 INFO [launcher]   cstrike\sprites\kill_rarity.spr
+2026-07-20 13:00:34,358 INFO [launcher]   cstrike\gfx\vgui2\800cornerborder_half3.tga
+2026-07-20 13:00:34,358 INFO [launcher]   cstrike_new.exe
+2026-07-20 13:00:34,358 INFO [launcher]   valve\resource\gameui_english.txt
+2026-07-20 13:00:34,358 INFO [launcher]   cstrike\dlls\mp.dll
+2026-07-20 13:00:34,358 INFO [launcher]   cstrike\resource\VideoAvancedDialog.res
+2026-07-20 13:00:34,358 INFO [launcher]   valve\resource\gameui_russian.txt
+2026-07-20 13:00:34,358 INFO [launcher]   cstrike\resource\nextclient_ukrainian.txt
+2026-07-20 13:00:34,358 INFO [launcher]   cstrike\resource\OptionsSubMiscellaneous.res
+2026-07-20 13:00:34,358 INFO [launcher]   cstrike\gfx\vgui2\logo_steam.tga
+2026-07-20 13:00:34,358 INFO [launcher]   cstrike\resource\OptionsSubVideo.res
+2026-07-20 13:00:34,358 INFO [launcher]   cstrike\resource\nextclient_english.txt
+2026-07-20 13:00:34,358 INFO [launcher]   cstrike\resource\cstrike_russian.txt
+2026-07-20 13:00:34,358 INFO [launcher]   cstrike\gfx\vgui2\800cornerborder4.tga
+2026-07-20 13:00:34,358 INFO [launcher]   cstrike\resource\cstrike_spanish.txt
+2026-07-20 13:00:34,358 INFO [launcher]   cstrike\gfx\shell\kb_act.lst
+2026-07-20 13:00:34,358 INFO [launcher]   cstrike\resource\TrackerScheme.res
+2026-07-20 13:00:34,358 INFO [launcher]   cstrike\resource\nextclient_russian.txt
+2026-07-20 13:00:34,358 INFO [launcher]   cstrike\gfx\vgui2\800cornerborder_half4.tga
+2026-07-20 13:00:34,358 INFO [launcher]   cstrike\resource\MultiplayerAdvancedDialog.res
+2026-07-20 13:00:34,358 INFO [launcher]   cstrike\resource\CreateMultiplayerGameServerPage.res
+2026-07-20 13:00:34,358 INFO [launcher]   cstrike\resource\CreateMultiplayerGameBotPage.res
+2026-07-20 13:00:34,358 INFO [launcher]   cstrike\resource\cstrike_english.txt
+2026-07-20 13:00:34,358 INFO [launcher]   cstrike\resource\cstrike_ukrainian.txt
+2026-07-20 13:00:34,358 INFO [launcher]   cstrike\cl_dlls\GameUI.dll
+2026-07-20 13:00:34,358 INFO [launcher]   valve\resource\valve_ukrainian.txt
+2026-07-20 13:00:34,358 INFO [launcher]   valve\resource\OptionsSubMouse.res
+2026-07-20 13:00:34,358 INFO [launcher]   valve\resource\gameui_spanish.txt
+2026-07-20 13:00:34,358 INFO [launcher]   cstrike\gfx\shell\kb_def.lst
+2026-07-20 13:00:34,358 INFO [launcher]   valve\resource\valve_english.txt
+2026-07-20 13:00:34,358 INFO [launcher]   valve\resource\OptionsSubVideo.res
+2026-07-20 13:00:34,358 INFO [launcher]   cstrike\gfx\vgui2\800corner4.tga
+2026-07-20 13:00:34,358 INFO [launcher]   valve\resource\valve_spanish.txt
+2026-07-20 13:00:34,358 INFO [launcher]   valve\resource\gameui_ukrainian.txt
+2026-07-20 13:00:34,358 INFO [launcher]   valve\resource\OptionsSubVoice.res
+2026-07-20 13:00:34,358 INFO [launcher]   platform\steam\steam_api.dll
+2026-07-20 13:00:34,358 INFO [launcher]   platform\servers\InternetGamesPage_Filters.res
+2026-07-20 13:00:34,358 INFO [launcher]   cstrike\gfx\vgui2\800cornerborder_half2.tga
+2026-07-20 13:00:34,358 INFO [launcher]   cstrike\resource\schemes\TrackerScheme_Source.res
+2026-07-20 13:00:34,359 INFO [launcher]   cstrike\resource\schemes\TrackerScheme_ClassicPlus.res
+2026-07-20 13:00:34,359 INFO [launcher]   cstrike\gfx\vgui2\800cornerborder2.tga
+2026-07-20 13:00:34,359 INFO [launcher]   cstrike\gfx\vgui2\800cornerborder3.tga
+2026-07-20 13:00:34,359 INFO [launcher]   cstrike\gfx\vgui2\800corner1.tga
+2026-07-20 13:00:34,359 INFO [launcher]   cstrike\gfx\vgui2\800cornerborder1.tga
+2026-07-20 13:00:34,359 INFO [launcher]   cstrike\gfx\vgui2\800corner2.tga
+2026-07-20 13:00:34,359 INFO [launcher]   cstrike\gfx\vgui2\800corner3.tga
+2026-07-20 13:00:34,359 INFO [launcher] Creating a backup
+2026-07-20 13:00:34,359 INFO [launcher] Opening files to install
+2026-07-20 13:00:34,370 INFO [launcher] Downloading an update
+2026-07-20 13:00:34,370 INFO [launcher] Make the updater window visible
+2026-07-20 13:00:46,530 INFO [launcher] Installing an update
+2026-07-20 13:00:46,543 INFO [launcher] Clearing backup folder
+2026-07-20 13:00:46,601 INFO [launcher] Updater GUI App result: RunNewGame
+2026-07-20 13:00:49,515 INFO [launcher] Exit
+2026-07-20 13:04:22,786 INFO [launcher] -----------------------------------------------
+2026-07-20 13:04:22,788 INFO [launcher] Start "cstrike.exe"
+2026-07-20 13:04:22,788 INFO [launcher] Version: 2.3.6
+2026-07-20 13:04:22,790 INFO [launcher] Finishing launcher update
+2026-07-20 13:04:22,791 INFO [launcher] Finishing launcher update: done
+2026-07-20 13:04:22,795 INFO [launcher] Branch: main
+2026-07-20 13:04:22,809 INFO [launcher] Start the Updater GUI App
+2026-07-20 13:04:22,814 INFO [launcher] Requesting remote config from server
+2026-07-20 13:04:23,253 INFO [launcher] Requesting remote config from server error: Remote config deserialization exception
+2026-07-20 13:04:23,253 INFO [launcher] Restoring from backup
+2026-07-20 13:04:23,254 INFO [launcher]   nothing to do
+2026-07-20 13:04:23,254 INFO [launcher] Clearing backup folder
+2026-07-20 13:04:23,254 INFO [launcher] Requesting file list from server
+2026-07-20 13:04:23,553 INFO [launcher] Gathering files that need to be updated
+2026-07-20 13:04:23,641 INFO [launcher]   files to update:
+2026-07-20 13:04:23,641 INFO [launcher]   cstrike_new.exe
+2026-07-20 13:04:23,641 INFO [launcher] Creating a backup
+2026-07-20 13:04:23,641 INFO [launcher] Opening files to install
+2026-07-20 13:04:23,642 INFO [launcher] Downloading an update
+2026-07-20 13:04:23,642 INFO [launcher] Make the updater window visible
+2026-07-20 13:04:23,953 INFO [launcher] -----------------------------------------------
+2026-07-20 13:04:23,956 INFO [launcher] Start "cstrike.exe"
+2026-07-20 13:04:23,956 INFO [launcher] Version: 2.3.6
+2026-07-20 13:04:23,957 INFO [launcher] Finishing launcher update
+2026-07-20 13:04:23,959 WARNING [launcher] Finish launcher update error: Can't delete cstrike_new.exe: Sharing violation.
+2026-07-20 13:04:23,962 INFO [launcher] Branch: main
+2026-07-20 13:04:24,022 INFO [launcher] Installing an update
+2026-07-20 13:04:24,023 INFO [launcher] Clearing backup folder
+2026-07-20 13:04:24,091 INFO [launcher] Updater GUI App result: RunNewGame
+2026-07-20 13:04:27,127 INFO [launcher] Exit
+2026-07-20 13:04:32,121 INFO [launcher] Exit
