@@ -18,10 +18,12 @@ This is not a software project. It documents installing and configuring **Wine o
 - Wine install uses the **hybrid approach** (see README.md and docs/01-install-wine.md): `Wine Stable.app` from the Gcenx GitHub builds extracted into `/Applications` (the `wine-stable` Homebrew cask is deprecated, disabled 2026-09-01), plus `brew install winetricks` for winetricks/cabextract.
 - Wine CLI binaries live at `/Applications/Wine Stable.app/Contents/Resources/wine/bin/` and are added to `PATH` in `~/.zshrc`.
 - Other fallbacks: CrossOver (paid), Sikarugir (free Wineskin/Kegworks successor) — see docs/02-install-alternatives.md.
+- Some games skip Wine entirely and run on a **native arm64 engine re-implementation** — see docs/03-native-engines.md.
 
 ## Conventions
 
-- **Steam games** run via **Sikarugir wrappers with a WineCX engine** (e.g. `games/steam-counter-strike/`; Sikarugir is the maintained successor of Kegworks, which is discontinued) — the modern Steam client does not work under plain upstream Wine (confirmed by testing 2026-07-17); only CrossOver-patched engines run it. Each game still gets `games/<game-slug>/` docs and a `run.sh` that opens its wrapper.
+- **Native engine first.** If a game has a maintained native arm64 engine re-implementation, use it instead of Wine. Decided for **Counter-Strike 1.6 → Xash3D FWGS + CS16Client**, installed at `~/Games/cs16`, launched by `games/counter-strike/run.sh` (`make counter-strike`): GoldSrc crashes under every Wine variant on this machine with `err:seh:NtRaiseException Exception frame is not in stack limits` (tested exhaustively 2026-07-20, not fixable from the Wine side). Details in docs/03-native-engines.md and games/counter-strike/README.md.
+- **Steam games** run via **Sikarugir wrappers with a WineCX engine** (e.g. `games/steam-counter-strike/`; Sikarugir is the maintained successor of Kegworks, which is discontinued) — the modern Steam client does not work under plain upstream Wine (confirmed by testing 2026-07-17); only CrossOver-patched engines run it. Each game still gets `games/<game-slug>/` docs and a `run.sh` that opens its wrapper. CS 1.6 was originally planned for this route; it now uses the native Xash3D build instead, and `games/steam-counter-strike/` is kept as reference for future Steam titles.
 - **Non-Steam games** get their own plain-Wine prefix under `~/wine-prefixes/<game-slug>` (e.g. `~/wine-prefixes/blue-glass-moon`). Never install games into the default `~/.wine` prefix.
 - All prefixes use `WINEARCH=win64` unless a game specifically needs 32-bit.
 - Per-game docs live in `games/<game-slug>/README.md`; launcher scripts in `games/<game-slug>/run.sh`.
@@ -31,6 +33,10 @@ This is not a software project. It documents installing and configuring **Wine o
 ## Common commands
 
 ```sh
+# Launch Counter-Strike 1.6 (native Xash3D, no Wine)
+make counter-strike
+make counter-strike ARGS="-windowed"    # or ARGS="-dedicated" for a headless server
+
 # Create a new 64-bit prefix for a game
 WINEPREFIX=~/wine-prefixes/<game-slug> WINEARCH=win64 wineboot
 

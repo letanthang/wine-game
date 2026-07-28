@@ -63,4 +63,6 @@ export PATH="$HOME/bin:/Applications/Wine Stable.app/Contents/Resources/wine/bin
 
 ## Recommendation for this project
 
-Split by distribution: **standalone (non-Steam) games** use the Gcenx CLI Wine with per-game prefixes (this repo's default workflow); **Steam games** use Sikarugir with a WineCX engine, because the Steam client only works under CrossOver-patched Wine.
+Check for a **native arm64 engine re-implementation** first — if one exists, it beats every Wine option (see `docs/03-native-engines.md`; Counter-Strike 1.6 went this way with Xash3D FWGS, because GoldSrc cannot run under Wine on macOS at all).
+
+Otherwise split by distribution: **standalone (non-Steam) games** use the Gcenx CLI Wine with per-game prefixes (this repo's default workflow); **Steam games** use Sikarugir with a WineCX engine, because the Steam client only works under CrossOver-patched Wine.

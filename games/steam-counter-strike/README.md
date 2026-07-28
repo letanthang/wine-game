@@ -1,5 +1,10 @@
 # Counter-Strike 1.6 (Steam)
 
+> **Not the route this project uses for CS 1.6.** The game now runs on the
+> native arm64 Xash3D FWGS engine — see `games/counter-strike/` and
+> `docs/03-native-engines.md`. These notes are kept as the reference recipe for
+> *future Steam titles*, which still need a Sikarugir wrapper.
+
 - **Runs via:** Sikarugir wrapper with a WineCX engine (NOT a plain Wine prefix)
 - **Distribution:** Steam (app id `10`)
 - **Engine:** GoldSrc — old and light, runs well on Apple Silicon.

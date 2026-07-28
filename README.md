@@ -5,7 +5,19 @@ with Wine. First target game: **A Piece of Blue Glass Moon** (the Tsukihime rema
 
 - Setup guide: [docs/01-install-wine.md](docs/01-install-wine.md)
 - Install alternatives: [docs/02-install-alternatives.md](docs/02-install-alternatives.md)
+- Native engines (no Wine): [docs/03-native-engines.md](docs/03-native-engines.md)
 - Per-game notes: `games/<game-slug>/README.md`, launchers in `games/<game-slug>/run.sh`
+
+## Games and how each one runs
+
+Not every game goes through Wine — if a maintained native arm64 engine exists,
+it wins. Check that first.
+
+| Game | Route | Notes |
+| --- | --- | --- |
+| [Counter-Strike 1.6](games/counter-strike/README.md) | **Native Xash3D FWGS** (no Wine) | `make counter-strike`, or `make counter-strike-offline MAP=de_dust2 BOTS=8` for a match against bots. GoldSrc crashes under every Wine variant on macOS — see [docs/03-native-engines.md](docs/03-native-engines.md) |
+| A Piece of Blue Glass Moon | Plain Wine prefix | `make prefix GAME=blue-glass-moon FONTS=1` |
+| [Steam games](games/steam-counter-strike/README.md) | Sikarugir wrapper (WineCX engine) | Steam client does not work under plain upstream Wine |
 
 ## Installation
 
@@ -66,8 +78,13 @@ winetricks --version
 
 ### 5. Create a prefix for a game
 
-**Steam games do not use these prefixes** — the modern Steam client does not
-work under plain upstream Wine (tested 2026-07-17). Steam games run via
+**Games with a native engine do not use these prefixes** — e.g. Counter-Strike
+1.6 runs on native arm64 Xash3D FWGS, no Wine at all; see
+[games/counter-strike/README.md](games/counter-strike/README.md) and
+[docs/03-native-engines.md](docs/03-native-engines.md).
+
+**Steam games do not use these prefixes either** — the modern Steam client does
+not work under plain upstream Wine (tested 2026-07-17). Steam games run via
 Sikarugir wrappers instead; see
 [games/steam-counter-strike/README.md](games/steam-counter-strike/README.md).
 
