@@ -6,6 +6,7 @@ with Wine. First target game: **A Piece of Blue Glass Moon** (the Tsukihime rema
 - Setup guide: [docs/01-install-wine.md](docs/01-install-wine.md)
 - Install alternatives: [docs/02-install-alternatives.md](docs/02-install-alternatives.md)
 - Native engines (no Wine): [docs/03-native-engines.md](docs/03-native-engines.md)
+- CS 1.6 dedicated server on Debian: [games/counter-strike/rehlds/README.md](games/counter-strike/rehlds/README.md)
 - Per-game notes: `games/<game-slug>/README.md`, launchers in `games/<game-slug>/run.sh`
 
 ## Games and how each one runs
@@ -16,6 +17,7 @@ it wins. Check that first.
 | Game | Route | Notes |
 | --- | --- | --- |
 | [Counter-Strike 1.6](games/counter-strike/README.md) | **Native Xash3D FWGS** (no Wine) | `make counter-strike`, or `make counter-strike-offline MAP=de_dust2 BOTS=8` for a match against bots. GoldSrc crashes under every Wine variant on macOS — see [docs/03-native-engines.md](docs/03-native-engines.md) |
+| [CS 1.6 dedicated server](games/counter-strike/rehlds/README.md) | **ReHLDS on Debian** (x86_64, no Wine) | ReHLDS + ReGameDLL + Metamod-R + ReUnion + AMXX + bots, one-shot `install.sh`. `make counter-strike-server` runs it in Docker, but only on x86_64 hosts — the engine will not run under emulation on Apple Silicon |
 | A Piece of Blue Glass Moon | Plain Wine prefix | `make prefix GAME=blue-glass-moon FONTS=1` |
 | [Steam games](games/steam-counter-strike/README.md) | Sikarugir wrapper (WineCX engine) | Steam client does not work under plain upstream Wine |
 

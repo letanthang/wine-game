@@ -1,0 +1,43 @@
+# CS 1.6 ReHLDS server.
+#
+# Requires an x86_64 host (Debian VPS, Intel Mac, CI). It does not work on Apple
+# Silicon: GoldSrc is 32-bit x86 only, and Valve's engine crashes under the QEMU
+# emulation that arm64 would need — see README.md.
+#
+# Two ways to use it:
+#   docker compose up --build     build the image here (needs the repo)
+#   CS16_IMAGE=docker.io/<user>/cs16-rehlds:latest docker compose up
+#                                 run the image CI published, no build
+name: cs16-rehlds
+
+services:
+  cs16:
+    image: ${CS16_IMAGE:-cs16-rehlds:local}
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    platform: linux/386
+    container_name: cs16-rehlds
+    ports:
+      - "27015:27015/udp"
+      - "27015:27015/tcp"
+    environment:
+      MAP: de_dust2
+      MAXPLAYERS: 16
+      PORT: "27015"
+      # Copy these configs over the baked-in ones on every start, so editing
+      # cfg/*.cfg only needs a restart. Drop the cfg mount below to use exactly
+      # what the image shipped with.
+      CFG_OVERRIDE_DIR: /opt/rehlds-setup/cfg
+      # Let Docker's restart policy own restarts instead of hlds_run.
+      HLDS_EXTRA_ARGS: -norestart
+    volumes:
+      - ../cfg:/opt/rehlds-setup/cfg:ro
+      # Keep server logs across container recreations.
+      - cs16-logs:/opt/cs16-server/cstrike/logs
+    stdin_open: true
+    tty: true
+    restart: unless-stopped
+
+volumes:
+  cs16-logs:

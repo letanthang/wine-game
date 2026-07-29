@@ -1,0 +1,30 @@
+[Unit]
+Description=Counter-Strike 1.6 dedicated server (ReHLDS)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=cs16
+Group=cs16
+WorkingDirectory=/home/cs16/cs16-server
+Environment=SERVER_DIR=/home/cs16/cs16-server
+Environment=MAP=de_dust2
+Environment=MAXPLAYERS=16
+Environment=PORT=27015
+# hlds_run restarts the engine itself; let systemd own that instead.
+Environment=HLDS_EXTRA_ARGS=-norestart
+ExecStart=/home/cs16/wine-game/games/counter-strike/rehlds/start.sh
+Restart=on-failure
+RestartSec=5
+KillSignal=SIGINT
+
+# Hardening — the server needs nothing outside its own directory.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=read-only
+ReadWritePaths=/home/cs16/cs16-server
+
+[Install]
+WantedBy=multi-user.target
