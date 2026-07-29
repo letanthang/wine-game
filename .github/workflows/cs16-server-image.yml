@@ -1,0 +1,117 @@
+# Build the self-contained CS 1.6 ReHLDS server image and publish it to Docker Hub.
+#
+# This is what makes the whole thing usable from an Apple Silicon Mac: the image
+# is linux/386 and can only be built on x86_64, which is exactly what GitHub's
+# ubuntu-latest runners are. The Mac never builds or runs it — it just pulls on
+# the target server.
+#
+# Publishing needs two repository secrets. Without them the workflow still builds
+# and smoke-tests the image locally, it just does not push:
+#   DOCKERHUB_USERNAME  Docker Hub account name
+#   DOCKERHUB_TOKEN     Docker Hub access token (not the account password)
+#
+# Consume the result with:
+#   docker pull docker.io/<user>/cs16-rehlds:latest
+#   CS16_IMAGE=docker.io/<user>/cs16-rehlds:latest docker compose up -d
+name: CS 1.6 server image
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'games/counter-strike/rehlds/**'
+      - '.github/workflows/cs16-server-image.yml'
+    tags: ['cs16-v*']
+  pull_request:
+    paths:
+      - 'games/counter-strike/rehlds/**'
+  workflow_dispatch:
+
+jobs:
+  build:
+    # Must be x86_64: the image is 32-bit x86 and both SteamCMD and the GoldSrc
+    # engine crash under QEMU emulation.
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    env:
+      # Empty until the secrets exist — every publish step is guarded on this.
+      PUSH: ${{ github.event_name != 'pull_request' && secrets.DOCKERHUB_TOKEN != '' }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        if: env.PUSH == 'true'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Derive tags
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: docker.io/${{ secrets.DOCKERHUB_USERNAME || github.repository_owner }}/cs16-rehlds
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,format=short
+            type=ref,event=tag
+            type=ref,event=pr
+
+      - name: Build (and push when the Docker Hub secrets are set)
+        uses: docker/build-push-action@v6
+        with:
+          context: games/counter-strike/rehlds
+          file: games/counter-strike/rehlds/docker/Dockerfile
+          platforms: linux/386
+          push: ${{ env.PUSH == 'true' }}
+          load: ${{ env.PUSH != 'true' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Smoke-test the image
+        run: |
+          IMAGE="$(echo '${{ steps.meta.outputs.tags }}' | head -1)"
+          # Not --rm: keep the container around so the log survives a crash.
+          docker run --name cs16-smoke -d "$IMAGE" >/dev/null
+
+          # The engine needs a few seconds to load the stack and the first map.
+          for _ in $(seq 1 24); do
+            docker logs cs16-smoke 2>&1 | grep -q 'Mapchange to' && break
+            sleep 5
+          done
+
+          LOG="$(docker logs cs16-smoke 2>&1)"
+          echo "$LOG" | tail -40
+
+          check() { echo "$LOG" | grep -q "$1" || { echo "MISSING: $2"; exit 1; }; }
+          check 'Protocol version 48' 'engine did not start'
+          check 'Metamod-r v'         'Metamod-R did not load'
+          check 'AMX Mod X version'   'AMX Mod X did not load'
+          check 'ReGameDLL version'   'ReGameDLL did not load'
+
+          # ReAPI and ReUnion do not announce themselves in the boot log, so check
+          # that they are in place and registered instead.
+          docker exec cs16-smoke test -f /opt/cs16-server/cstrike/addons/amxmodx/modules/reapi_amxx_i386.so
+          docker exec cs16-smoke grep -qE '^[[:space:]]*reapi[[:space:]]*$' \
+            /opt/cs16-server/cstrike/addons/amxmodx/configs/modules.ini
+          docker exec cs16-smoke test -f /opt/cs16-server/cstrike/addons/reunion/reunion_mm_i386.so
+          docker exec cs16-smoke grep -q 'reunion_mm_i386.so' \
+            /opt/cs16-server/cstrike/addons/metamod/plugins.ini
+
+          # Secrets must NOT be baked into a published image.
+          docker exec cs16-smoke grep -q '__RCON_PASSWORD__' /opt/rehlds-setup/cfg/server.cfg
+
+      - name: Collect logs on failure
+        if: failure()
+        run: docker logs cs16-smoke 2>&1 | tail -100 || true
+
+      - name: Clean up
+        if: always()
+        run: docker rm -f cs16-smoke >/dev/null 2>&1 || true
