@@ -1,9 +1,10 @@
 # Build the self-contained CS 1.6 ReHLDS server image and publish it to Docker Hub.
 #
 # This is what makes the whole thing usable from an Apple Silicon Mac: the image
-# is linux/386 and can only be built on x86_64, which is exactly what GitHub's
-# ubuntu-latest runners are. The Mac never builds or runs it — it just pulls on
-# the target server.
+# is linux/amd64 (with 32-bit multi-arch inside, since GoldSrc is i386-only) and
+# can only be built on x86_64, which is exactly what GitHub's ubuntu-latest
+# runners are. The Mac never builds or runs it — it just pulls on the target
+# server.
 #
 # Publishing needs two repository secrets. Without them the workflow still builds
 # and smoke-tests the image locally, it just does not push:
@@ -29,7 +30,7 @@ on:
 
 jobs:
   build:
-    # Must be x86_64: the image is 32-bit x86 and both SteamCMD and the GoldSrc
+    # Must be x86_64: the payload is 32-bit x86 and both SteamCMD and the GoldSrc
     # engine crash under QEMU emulation.
     runs-on: ubuntu-latest
     permissions:
@@ -67,7 +68,7 @@ jobs:
         with:
           context: games/counter-strike/rehlds
           file: games/counter-strike/rehlds/docker/Dockerfile
-          platforms: linux/386
+          platforms: linux/amd64
           push: ${{ env.PUSH == 'true' }}
           load: ${{ env.PUSH != 'true' }}
           tags: ${{ steps.meta.outputs.tags }}

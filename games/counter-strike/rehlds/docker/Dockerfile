@@ -4,13 +4,16 @@
 # ReGameDLL, Metamod-R, ReAPI, ReUnion, AMX Mod X, plugins — so the target host
 # only needs `docker pull` + `docker run`. Expect ~1.5 GB.
 #
-# GoldSrc is 32-bit x86 only, so this is a linux/386 image and it must be BUILT
-# and RUN on x86_64 (GitHub Actions runners, a Debian VPS, an Intel Mac). It does
-# not work on Apple Silicon: SteamCMD and the engine both crash under the QEMU
-# emulation arm64 would need — see README.md.
+# GoldSrc binaries are 32-bit x86 only. The image is linux/amd64 with i386
+# multi-arch enabled — an x86_64 kernel runs 32-bit user space natively, which is
+# the standard way HLDS is containerised.
+#
+# It must be BUILT and RUN on x86_64 (GitHub Actions runners, a Debian VPS, an
+# Intel Mac). It does not work on Apple Silicon: Rosetta does not support 32-bit
+# x86 at all, and under QEMU both SteamCMD and the engine crash — see README.md.
 #
 #   docker build -f docker/Dockerfile -t cs16-rehlds .     # context = rehlds/
-FROM --platform=linux/386 debian:12-slim
+FROM --platform=linux/amd64 debian:12-slim
 
 ENV DEBIAN_FRONTEND=noninteractive \
     HOME=/home/cs16 \
@@ -18,9 +21,12 @@ ENV DEBIAN_FRONTEND=noninteractive \
     STEAMCMD_DIR=/opt/steamcmd \
     SETUP_DIR=/opt/rehlds-setup
 
-RUN apt-get update \
+# i386 multi-arch: SteamCMD, the engine and every plugin are 32-bit.
+RUN dpkg --add-architecture i386 \
+ && apt-get update \
  && apt-get install -y --no-install-recommends \
-      ca-certificates curl unzip tar gnupg libstdc++6 libgcc-s1 procps \
+      ca-certificates curl unzip tar gnupg procps \
+      lib32gcc-s1 lib32stdc++6 libc6:i386 \
  && rm -rf /var/lib/apt/lists/* \
  && useradd -m -d /home/cs16 -s /bin/bash cs16 \
  && mkdir -p "${SERVER_DIR}" "${STEAMCMD_DIR}" \

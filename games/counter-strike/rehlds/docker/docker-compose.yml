@@ -1,8 +1,8 @@
 # CS 1.6 ReHLDS server.
 #
 # Requires an x86_64 host (Debian VPS, Intel Mac, CI). It does not work on Apple
-# Silicon: GoldSrc is 32-bit x86 only, and Valve's engine crashes under the QEMU
-# emulation that arm64 would need — see README.md.
+# Silicon: the binaries inside are 32-bit x86, Rosetta only emulates x86_64, and
+# under QEMU Valve's engine crashes — see README.md.
 #
 # Two ways to use it:
 #   docker compose up --build     build the image here (needs the repo)
@@ -16,7 +16,7 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile
-    platform: linux/386
+    platform: linux/amd64
     container_name: cs16-rehlds
     ports:
       - "27015:27015/udp"

@@ -9,9 +9,9 @@ Scope: Counter-Strike 1.6 only. Nothing here touches Wine, the Wine prefixes, or
 the Sikarugir wrapper.
 ## Distribution flow
 
-The image is 32-bit x86 and can only be built on x86_64 — which is what GitHub's
-runners are. So the Mac never builds or runs the server; CI does the packaging
-and the target host only pulls.
+The payload is 32-bit x86 and can only be built and run on x86_64 — which is what
+GitHub's runners are. So the Mac never builds or runs the server; CI does the
+packaging and the target host only pulls.
 
 ```
 GitHub  ──►  GitHub Actions (ubuntu-latest, x86_64)
@@ -22,7 +22,7 @@ GitHub  ──►  GitHub Actions (ubuntu-latest, x86_64)
                  ├─ ReHLDS + ReGameDLL       (GPG-verified)
                  ├─ Metamod-R + ReAPI + ReUnion + AMX Mod X
                  ├─ plugins/*.amxx + cfg/*
-                 ├─ build linux/386 image    (docker/Dockerfile)
+                 ├─ build linux/amd64 image  (docker/Dockerfile)
                  └─ smoke-test: engine, Metamod-R, AMXX, ReGameDLL all load
                        │
                        ▼
@@ -71,10 +71,26 @@ HTTPS from the project's own release hosting.
    so the game files must come from the `steam_legacy` branch:
    `app_update 90 -beta steam_legacy validate`. The current default branch ships
    the 25th-anniversary build, which ReHLDS will not run.
-2. **32-bit x86.** Everything is i386. On Debian amd64 that means enabling
-   multi-arch (`dpkg --add-architecture i386`) — `install.sh` does it. On arm64
-   there are no native binaries at all; use an x86_64 host, or the Docker image
-   below under emulation.
+2. **32-bit x86.** Everything is i386 — engine, game DLL and every plugin. On
+   Debian amd64 that means enabling multi-arch (`dpkg --add-architecture i386`);
+   `install.sh` and the Dockerfile both do it. On arm64 there are no native
+   binaries at all and no way to make some: use an x86_64 host.
+
+## Make targets
+
+This directory has its own `Makefile` — run `make` (or `make help`) in it:
+
+| Target | What it does |
+| --- | --- |
+| `make install` | run `install.sh` (bare-metal Debian) |
+| `make start` | run `start.sh` in the foreground |
+| `make build` | `docker buildx build --platform linux/amd64 --load` → `cs16-rehlds:local` |
+| `make push REGISTRY=docker.io/<user> TAG=latest` | build and push to a registry |
+| `make up` / `down` / `restart` | drive `docker/docker-compose.yml` |
+| `make logs` / `shell` / `status` | inspect a running container |
+| `make clean` | drop the image and the log volume |
+
+Overridable: `IMAGE`, `TAG`, `REGISTRY`, `PLATFORM`.
 
 ## Quick start on a Debian VPS (x86_64)
 
@@ -128,14 +144,17 @@ make counter-strike-server              # from the repo root
 cd games/counter-strike/rehlds/docker && docker compose up --build
 ```
 
-The image is `linux/386`. On an x86_64 host (Linux, Intel Mac, CI) that is
-native and works. **On Apple Silicon it does not work** — see below. The real
+The image is `linux/amd64` with i386 multi-arch enabled inside — an x86_64 kernel
+runs the 32-bit GoldSrc binaries natively. On any x86_64 host (Linux, Intel Mac,
+CI) that just works. **On Apple Silicon it does not** — see below. The real
 deployment target is a Debian x86_64 host either way.
 
 ### Why it fails on Apple Silicon (tested 2026-07-28/29 on an M4)
 
-GoldSrc is 32-bit x86, so on arm64 the container runs under QEMU user-mode
-emulation, and **Valve's Steam libraries do not survive that**:
+GoldSrc is 32-bit x86 and Rosetta only emulates x86_64, so on arm64 the 32-bit
+binaries fall through to QEMU user-mode emulation — and **Valve's Steam libraries
+do not survive that**. This holds for `linux/amd64` and `linux/386` images alike;
+the tests below were run with the latter:
 
 1. SteamCMD segfaults immediately: `Loading Steam API… Segmentation fault`, every
    pass. So the game files cannot be downloaded inside the container.
@@ -278,8 +297,8 @@ scp ~/Games/cs16/cstrike/maps/*.nav <server>:~/cs16-server/cstrike/maps/
 
 ## What has been verified so far
 
-Verified on 2026-07-28/29 by running the installer inside the `linux/386`
-container on the M4:
+Verified on 2026-07-28/29 by running the installer inside an i386 container on
+the M4 (the image was `linux/386` at the time; it is `linux/amd64` now):
 
 - the full pipeline: dependencies, game files, ReHLDS, ReGameDLL, zBot data,
   Metamod-R, ReUnion, AMX Mod X, `liblist.gam` patch, configs, `.nav` check;

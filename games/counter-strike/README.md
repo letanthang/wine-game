@@ -64,7 +64,7 @@ server](#bots-only-work-on-a-listen-server)), and it is an arm64 client build.
 To host a real server, use the ReHLDS stack on Debian:
 [`rehlds/README.md`](rehlds/README.md) — ReHLDS + ReGameDLL_CS + Metamod-R +
 ReUnion + AMX Mod X + zBot, one-shot `install.sh`, a systemd unit, and a
-`linux/386` Docker image (`make counter-strike-server`) for x86_64 hosts — that
+`linux/amd64` Docker image (`make counter-strike-server`) for x86_64 hosts — that
 image will not run on this Mac, Valve's engine crashes under QEMU emulation.
 ReUnion is what lets this Xash3D client connect without a Steam ticket.
 
