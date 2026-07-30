@@ -22,12 +22,13 @@ counter-strike:
 counter-strike-offline:
 	BOTS=$(or $(BOTS),8) games/counter-strike/run.sh +map $(or $(MAP),de_dust2) $(ARGS)
 
-# Build and run the CS 1.6 ReHLDS dedicated server in Docker (linux/amd64).
-# Works on x86_64 hosts only: under QEMU on Apple Silicon the installer runs but
-# the engine crashes in Valve's Steam init. The real deployment target is a
-# Debian x86_64 host — see games/counter-strike/rehlds/README.md.
+# Build the CS 1.6 ReHLDS dedicated server image, in two steps:
+#   1. fetch  — download and assemble the server files on this host
+#   2. build  — package them into a linux/amd64 image (no network)
+# Building works anywhere, including Apple Silicon; running the server needs an
+# x86_64 host. See games/counter-strike/rehlds/README.md.
 counter-strike-server:
-	docker compose -f games/counter-strike/rehlds/docker/docker-compose.yml up --build
+	$(MAKE) -C games/counter-strike/rehlds all
 
 # Create a 64-bit Wine prefix for a game under ~/wine-prefixes/<GAME>.
 # Usage:

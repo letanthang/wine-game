@@ -9,31 +9,97 @@ Scope: Counter-Strike 1.6 only. Nothing here touches Wine, the Wine prefixes, or
 the Sikarugir wrapper.
 ## Distribution flow
 
-The payload is 32-bit x86 and can only be built and run on x86_64 — which is what
-GitHub's runners are. So the Mac never builds or runs the server; CI does the
-packaging and the target host only pulls.
+Two separate steps. **Step 1** downloads and assembles every file the server
+needs on the host — SteamCMD runs here, where it works. **Step 2** packages that
+directory into an image and downloads nothing at all.
+
+```sh
+cd games/counter-strike/rehlds
+make fetch     # step 1 → local/server-files/  (~870 MB, runs on any host)
+make build     # step 2 → cs16-rehlds:local    (no network, seconds)
+```
+
+Splitting them is what makes the whole thing work on an Apple Silicon Mac:
+SteamCMD cannot run inside an emulated x86 container, but it runs natively on
+macOS. Only *running* the finished server still requires x86_64.
 
 ```
-GitHub  ──►  GitHub Actions (ubuntu-latest, x86_64)
-                 │  .github/workflows/cs16-server-image.yml
-                 │
-                 ├─ install SteamCMD
-                 ├─ download HLDS (app 90, steam_legacy branch)
-                 ├─ ReHLDS + ReGameDLL       (GPG-verified)
-                 ├─ Metamod-R + ReAPI + ReUnion + AMX Mod X
-                 ├─ plugins/*.amxx + cfg/*
-                 ├─ build linux/amd64 image  (docker/Dockerfile)
-                 └─ smoke-test: engine, Metamod-R, AMXX, ReGameDLL all load
-                       │
-                       ▼
-              Docker Hub: docker.io/<user>/cs16-rehlds
-                       │
-                       ▼
-              Target server (Debian x86_64)
-                       ├── docker pull
-                       └── docker run   ── rcon password + ReUnion salt
-                                           generated at run time, not baked in
+STEP 1 — Prepare / Download Server Files
+
+────────────────────────────────────────────────────────
+
+Source / Release files
+
+   │
+
+   ├─ HLDS files
+
+   ├─ ReHLDS
+
+   ├─ ReGameDLL
+
+   ├─ Metamod-R
+
+   ├─ ReAPI
+
+   ├─ ReUnion
+
+   ├─ AMX Mod X
+
+   ├─ plugins/*.amxx
+
+   └─ cfg/*
+
+          │
+
+          ▼
+
+    local/server-files/
+
+          │
+
+          │ verify / checksum
+
+          ▼
+
+    Complete CS16 server files
+
+
 ```
+```
+
+STEP 2 — Build Docker Image
+────────────────────────────────────────────────────────
+
+local/server-files/
+        │
+        ▼
+docker/Dockerfile
+        │
+        ├─ COPY HLDS files
+        ├─ COPY ReHLDS
+        ├─ COPY ReGameDLL
+        ├─ COPY Metamod-R / ReAPI / ReUnion
+        ├─ COPY AMX Mod X
+        ├─ COPY plugins/*.amxx
+        └─ COPY cfg/*
+                │
+                ▼
+         docker build
+                │
+                ▼
+docker.io/<user>/cs16-rehlds
+                │
+                ▼
+        Target Debian x86_64
+                │
+                ├─ docker pull
+                └─ docker run
+                       │
+                       ├─ RCON password → runtime
+                       └─ ReUnion salt → runtime
+```
+
 
 Everything below documents the same steps, whether you run them through CI, in
 Docker locally on an x86_64 box, or straight on a VPS with `install.sh`.
@@ -82,15 +148,20 @@ This directory has its own `Makefile` — run `make` (or `make help`) in it:
 
 | Target | What it does |
 | --- | --- |
-| `make install` | run `install.sh` (bare-metal Debian) |
-| `make start` | run `start.sh` in the foreground |
-| `make build` | `docker buildx build --platform linux/amd64 --load` → `cs16-rehlds:local` |
-| `make push REGISTRY=docker.io/<user> TAG=latest` | build and push to a registry |
+| `make fetch` | **step 1** — download + assemble `local/server-files/` |
+| `make build` | **step 2** — package that tree into `cs16-rehlds:local` |
+| `make all` | both |
+| `make push REGISTRY=docker.io/<user> TAG=latest` | package and push to a registry |
 | `make up` / `down` / `restart` | drive `docker/docker-compose.yml` |
 | `make logs` / `shell` / `status` | inspect a running container |
+| `make install` / `start` | bare-metal install and launch (on a Debian server) |
 | `make clean` | drop the image and the log volume |
+| `make distclean` | also delete `local/server-files/` |
 
 Overridable: `IMAGE`, `TAG`, `REGISTRY`, `PLATFORM`.
+
+`make build` refuses to run when `local/server-files/` is missing, so the two
+steps cannot silently drift apart.
 
 ## Quick start on a Debian VPS (x86_64)
 
@@ -102,6 +173,16 @@ cd ~/wine-game/games/counter-strike/rehlds
 ./install.sh          # ~1 GB download, several SteamCMD passes, ~10 min
 ./start.sh            # foreground, Ctrl+C to stop
 ```
+
+`install.sh` also runs in phases, which is what keeps the Docker build cacheable:
+
+```sh
+./install.sh --help            # list the steps
+./install.sh addons configs    # re-apply Metamod/ReUnion/AMXX/ReAPI + configs only
+```
+
+Steps, in order: `deps`, `game`, `engine`, `addons`, `configs`. No arguments runs
+all five.
 
 `install.sh` is safe to re-run — it re-applies the binaries and configs but
 keeps the generated rcon password and ReUnion salt.
@@ -136,25 +217,66 @@ sudo ufw allow 27015/udp     # game traffic
 sudo ufw allow 27015/tcp     # rcon
 ```
 
-## Docker (x86_64 hosts only — it does not run on Apple Silicon)
+## Step 1 — prepare the server files
 
 ```sh
-make counter-strike-server              # from the repo root
-# equivalent to:
-cd games/counter-strike/rehlds/docker && docker compose up --build
+cd games/counter-strike/rehlds
+make fetch                    # or ./fetch.sh
 ```
 
-The image is `linux/amd64` with i386 multi-arch enabled inside — an x86_64 kernel
-runs the 32-bit GoldSrc binaries natively. On any x86_64 host (Linux, Intel Mac,
-CI) that just works. **On Apple Silicon it does not** — see below. The real
-deployment target is a Debian x86_64 host either way.
+This is the only step that touches the network. It runs **on your machine**, not
+in a container, and produces `local/server-files/` (~870 MB, gitignored):
 
-### Why it fails on Apple Silicon (tested 2026-07-28/29 on an M4)
+- HLDS game files — SteamCMD, app 90, `steam_legacy` branch;
+- ReHLDS and ReGameDLL_CS, with their GPG signatures verified;
+- zBot data, Metamod-R, ReUnion, AMX Mod X, ReAPI;
+- this repo's `cfg/*` and `plugins/*.amxx`, and the patched `liblist.gam`;
+- `BUILD_INFO` (what went in) and `SHA256SUMS` (checksums for the whole tree).
 
-GoldSrc is 32-bit x86 and Rosetta only emulates x86_64, so on arm64 the 32-bit
-binaries fall through to QEMU user-mode emulation — and **Valve's Steam libraries
-do not survive that**. This holds for `linux/amd64` and `linux/386` images alike;
-the tests below were run with the latter:
+Requirements: `curl`, `unzip`, `gpg`, and SteamCMD.
+
+```sh
+brew install gnupg                  # macOS: gpg is not shipped
+brew install --cask steamcmd        # macOS: x86_64 binary, runs under Rosetta
+```
+
+On Linux, `fetch.sh` downloads SteamCMD itself if it is not on `PATH`. On macOS
+it refuses to install anything silently and prints the `brew` line instead.
+
+**Why this step exists.** SteamCMD segfaults under QEMU, so it cannot run inside
+an x86 container on Apple Silicon; the macOS build is a native x86_64 Mach-O that
+Rosetta handles, and `@sSteamCmdForcePlatformType linux` makes it fetch the Linux
+server files anyway. Doing the download here also means the image build needs no
+network at all.
+
+Re-running is cheap — SteamCMD only re-fetches changed files, and `validate`
+re-checks every checksum. The `steam_legacy` branch is frozen at buildid
+`5433925` (built 2020-08-19), so in practice nothing changes; `versions.env` pins
+that id and the build stops if the branch ever moves.
+
+## Step 2 — build the image
+
+```sh
+make build                            # → cs16-rehlds:local
+make push REGISTRY=docker.io/<user> TAG=latest
+```
+
+The Dockerfile only copies `local/server-files/` in, adds the 32-bit runtime
+libraries and the entrypoint, and asserts that every expected binary is present.
+No downloads, no SteamCMD, no build arguments — so it takes seconds and builds
+identically everywhere, Apple Silicon included.
+
+The image is `linux/amd64` with i386 multi-arch enabled inside: an x86_64 kernel
+runs the 32-bit GoldSrc binaries natively. **Running** it still requires an
+x86_64 host — see below. The deployment target is a Debian x86_64 machine.
+
+### Why the server cannot run on Apple Silicon (tested 2026-07-28/30 on an M4)
+
+Building works fine there — that is the point of the two-step split. Running does
+not. GoldSrc is 32-bit x86 and Rosetta only emulates x86_64, so on arm64 the
+32-bit binaries fall through to QEMU user-mode emulation, and **Valve's Steam
+libraries do not survive that**. This holds for `linux/amd64` and `linux/386`
+images alike, and for vanilla Valve HLDS as much as for ReHLDS:
 
 1. SteamCMD segfaults immediately: `Loading Steam API… Segmentation fault`, every
    pass. So the game files cannot be downloaded inside the container.
@@ -172,15 +294,13 @@ the tests below were run with the latter:
    bots (`bot_quota 0` — same crash), Docker's seccomp profile
    (`seccomp:unconfined` — same crash), `-insecure +sv_lan 1` (same crash).
 
-On Apple Silicon the container therefore stops at step 1 — SteamCMD cannot fetch
-the game. During development the installer was verified anyway by handing it the
-files from outside (`GAME_SRC`), which is how the crash in step 2 was found; that
-detour is not part of the normal flow. Run the container on the x86_64 host that
-will actually serve the game — a Debian VPS with Docker installed works fine:
+So on an Apple Silicon Mac you can prepare the files, build the image and push
+it — but the server has to run somewhere else. A Debian VPS with Docker is the
+straightforward target:
 
 ```sh
-git clone <this repo> ~/wine-game
-cd ~/wine-game && make counter-strike-server
+docker run -d --name cs16 -p 27015:27015/udp -p 27015:27015/tcp \
+  -e RCON_PASSWORD=... -e REUNION_SALT=... docker.io/<user>/cs16-rehlds:latest
 ```
 
 ### Setting up CI (one-time)
@@ -213,33 +333,43 @@ CS16_IMAGE=docker.io/<user>/cs16-rehlds:latest docker compose up -d
 
 ### How the image is put together
 
-- **Everything is baked in at build time** — game files and the full stack — so
-  the image is self-contained (~1.5 GB) and starts in seconds.
-- **No credentials are baked in.** The build runs `install.sh` with
-  `NO_SECRETS=1`, leaving `__RCON_PASSWORD__` and `__STEAMID_HASH_SALT__`
-  placeholders; `docker/entrypoint.sh` fills them from `$RCON_PASSWORD` /
-  `$REUNION_SALT`, or with random values per run. Set both in production —
-  otherwise the rcon password changes on every restart and ReUnion hands players
-  new SteamIDs, which breaks AMXX admin entries.
+- **Self-contained** (~1.5 GB): the server tree from step 1 is copied in whole,
+  so the container starts in seconds and needs no network.
+- **No credentials are baked in.** Step 1 runs with `NO_SECRETS=1`, leaving
+  `__RCON_PASSWORD__` and `__STEAMID_HASH_SALT__` placeholders;
+  `docker/entrypoint.sh` fills them from `$RCON_PASSWORD` / `$REUNION_SALT`, or
+  with random values per run. Set both in production — otherwise the rcon
+  password changes on every restart and ReUnion hands players new SteamIDs,
+  which breaks AMXX admin entries.
 - The build **fails** rather than shipping a broken image: the Dockerfile
-  asserts that the engine, `cs.so`, Metamod-R, ReUnion, AMXX, ReAPI and the
-  patched `liblist.gam` are all in place.
-- `cfg/` is mounted by `docker-compose.yml`, so config tweaks need a restart,
-  not a rebuild. Drop that mount to run exactly what the image shipped with.
+  asserts that the engine, `cs.so`, Metamod-R, ReUnion, AMXX, ReAPI, the patched
+  `liblist.gam`, the placeholder and `BUILD_INFO` are all present.
+- **Layers follow how often things change**: the server tree first, then the
+  scripts and `cfg/`. Editing a config rebuilds only the small layer.
+- `cfg/` is also mounted by `docker-compose.yml`, so config tweaks need just a
+  restart. Drop that mount to run exactly what the image shipped with.
+
+Inspect any image:
+
+```sh
+docker run --rm --entrypoint cat cs16-rehlds:local /opt/cs16-server/BUILD_INFO
+```
 
 ### Reusing game files you already have (`GAME_SRC`, optional)
 
-If a host already has the HLDS files, `install.sh` can copy them instead of
-downloading ~870 MB again:
+If a machine already has the HLDS files, `install.sh` (and therefore `fetch.sh`)
+can copy them instead of downloading ~870 MB again:
 
 ```sh
-GAME_SRC=/path/to/hlds ./install.sh
+GAME_SRC=/path/to/hlds ./fetch.sh
 ```
 
 > This must be a **Linux HLDS server install** (SteamCMD app 90). A client
 > install is not enough: it lacks `libsteam_api.so`, and the engine then dies
-> with `Unable to load engine, image is corrupt`. Tested 2026-07-28 with the
-> Xash3D client files; `install.sh` warns when that file is missing.
+> with `Unable to load engine, image is corrupt`. The manifest is checked
+> against `GAME_BUILDID` and the branch before anything is copied, so a wrong
+> directory fails immediately (tested 2026-07-28/30 with the Xash3D client
+> files). `SKIP_GAME_CHECK=1` bypasses that check.
 
 ## Connecting from the macOS Xash3D client
 
@@ -297,24 +427,28 @@ scp ~/Games/cs16/cstrike/maps/*.nav <server>:~/cs16-server/cstrike/maps/
 
 ## What has been verified so far
 
-Verified on 2026-07-28/29 by running the installer inside an i386 container on
-the M4 (the image was `linux/386` at the time; it is `linux/amd64` now):
+Both steps were run end to end on an Apple Silicon M4 on 2026-07-30:
 
-- the full pipeline: dependencies, game files, ReHLDS, ReGameDLL, zBot data,
-  Metamod-R, ReUnion, AMX Mod X, `liblist.gam` patch, configs, `.nav` check;
-- **GPG signatures of ReHLDS and ReGameDLL genuinely check out**
-  (`Good signature from "ReHLDS Team <team@rehlds.dev>"`);
-- the engine loads the whole stack: `Protocol version 48`, Metamod-r,
-  AMX Mod X, `ReGameDLL version: 5.30.0.814-dev`, `Mapchange to de_dust2`.
+- **Step 1** (`make fetch`): SteamCMD fetched app 90 `steam_legacy` natively,
+  every component installed, **GPG signatures of ReHLDS and ReGameDLL genuinely
+  check out** (`Good signature from "ReHLDS Team <team@rehlds.dev>"`), and the
+  result is 6503 files / 871 MB with `BUILD_INFO` reporting game build
+  `5433925` and all six component versions.
+- **Step 2** (`make build`): 61 seconds, 0.94 GB image, all Dockerfile assertions
+  pass, `BUILD_INFO` readable from the image, and `server.cfg` still carries the
+  `__RCON_PASSWORD__` placeholder — no credentials baked in.
+- **Layer caching**: after editing `cfg/server.cfg`, the
+  `COPY local/server-files/` layer stays `CACHED` and only the config layer
+  rebuilds.
+- Earlier (2026-07-28/29), a container built the same way loaded the whole stack
+  on startup: `Protocol version 48`, Metamod-r, AMX Mod X,
+  `ReGameDLL version: 5.30.0.814-dev`, `Mapchange to de_dust2`.
 
-Not yet verified, because the engine cannot stay up under QEMU: bots actually
-joining a dedicated server, `meta list` showing ReUnion and ReAPI as `RUN`, and
-the Xash3D client connecting through ReUnion. The CI workflow re-checks the
-first half on real x86_64 hardware (it smoke-tests every published image); the
-rest needs the Debian host and the checks below.
-
-ReAPI and the `plugins/` mechanism were added after that test run and have not
-been through a build yet — the first CI run will tell.
+Still unverified, because the engine cannot stay up under emulation: bots
+actually joining a dedicated server, `meta list` showing ReUnion and ReAPI as
+`RUN`, and the Xash3D client connecting through ReUnion. CI re-checks the
+startup half on real x86_64 hardware for every image it publishes; the rest needs
+the Debian host and the checks below.
 
 ## Verifying an install
 
@@ -335,13 +469,17 @@ as `liblist.gam.orig`).
 
 ```
 rehlds/
-├── install.sh        # one-shot installer (Debian, bash — not macOS/zsh)
+├── fetch.sh          # step 1 — assemble local/server-files/ (runs on any host)
+├── install.sh        # the actual work: downloads, verifies, lays out the server
 ├── start.sh          # launches the engine with sane defaults
 ├── versions.env      # pinned versions + URLs, all overridable
+├── Makefile          # fetch / build / push / up / logs / clean
 ├── cfg/              # server.cfg, bots.cfg, game_init.cfg, plugins.ini, mapcycle
 ├── plugins/          # drop custom .amxx files here (see plugins/README.md)
 ├── systemd/          # cs16-rehlds.service
-└── docker/           # Dockerfile (build-time install), compose, entrypoint
+├── docker/           # step 2 — Dockerfile (copy only), compose, entrypoint
+└── local/            # step 1 output, gitignored (~870 MB)
+    └── server-files/ # complete server tree + BUILD_INFO + SHA256SUMS
 ```
 
 CI workflow: [`.github/workflows/cs16-server-image.yml`](../../../.github/workflows/cs16-server-image.yml)

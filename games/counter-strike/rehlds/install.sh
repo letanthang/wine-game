@@ -2,8 +2,12 @@
 # Install a Counter-Strike 1.6 dedicated server on Debian, built on the ReHLDS
 # stack (ReHLDS + ReGameDLL_CS + Metamod-R + ReUnion + AMX Mod X + zBot).
 #
-# This script runs ON THE DEBIAN SERVER, not on macOS — the rest of this repo
-# is macOS/zsh, this one is Linux/bash on purpose.
+# Two ways this script is used:
+#   - directly on a Debian server, to install and run the game there;
+#   - by fetch.sh on any host (macOS included), to assemble the file tree that
+#     the Docker image is built from.
+# It is bash, not zsh like the rest of this macOS repo, and it stays portable
+# between GNU and BSD userland for the second case.
 #
 # Safe to re-run: every step is skipped or refreshed idempotently, and
 # generated secrets (rcon password, ReUnion salt) are preserved.
@@ -16,6 +20,12 @@
 #   NAV_SRC=/path/to/maps      copy *.nav from here if the game files have none
 #   GAME_SRC=/path/to/hlds     take the game files from an existing HLDS install
 #                              instead of downloading them with SteamCMD
+#   SKIP_GAME_CHECK=1          accept a GAME_SRC whose app 90 manifest does not
+#                              match GAME_BUILDID/STEAM_APP_BRANCH
+#   NO_SECRETS=1               leave the rcon password and ReUnion salt as
+#                              placeholders (used when building an image)
+#
+# Run `install.sh --help` for the list of individual steps.
 
 set -euo pipefail
 
@@ -47,15 +57,35 @@ fetch() {  # fetch <dest> <url>
   curl -fsSL --retry 3 --retry-delay 2 -o "$1" "$2"
 }
 
-# 1. Sanity checks ---------------------------------------------------------
-[[ -f /etc/debian_version ]] || warn "This is not a Debian-like system; package install may fail."
+# --- portability shims ------------------------------------------------------
+# The server always runs on Linux, but step 1 (fetch.sh) assembles the files on
+# whatever machine the developer uses, and BSD/macOS tools differ here.
+IS_MACOS=0
+[[ "$(uname -s)" == "Darwin" ]] && IS_MACOS=1
 
-# 2. Dependencies ----------------------------------------------------------
+sed_i() {  # sed_i <sed-args...> <file>
+  if [[ $IS_MACOS -eq 1 ]]; then
+    sed -i '' "$@"
+  else
+    sed -i "$@"
+  fi
+}
+
+install_file() {  # install_file <mode> <src> <dst>   (BSD install has no -D)
+  local mode="$1" src="$2" dst="$3"
+  mkdir -p "$(dirname "$dst")"
+  cp "$src" "$dst"
+  chmod "$mode" "$dst"
+}
+
+# 1-2. Dependencies --------------------------------------------------------
 install_deps() {
   if [[ -n "${SKIP_DEPS:-}" ]]; then
     log "SKIP_DEPS set, not touching apt"
     return
   fi
+  [[ -f /etc/debian_version ]] ||
+    warn "This is not a Debian-like system; package install may fail."
   local arch pkgs
   arch="$(dpkg --print-architecture)"
   pkgs=(curl unzip tar gnupg ca-certificates)
@@ -75,19 +105,45 @@ install_deps() {
 }
 
 # 3. SteamCMD --------------------------------------------------------------
+STEAMCMD_BIN=""
+
 install_steamcmd() {
+  # A SteamCMD already on PATH wins — on macOS that is the Homebrew cask, an
+  # x86_64 Mach-O binary that Rosetta runs natively.
+  if command -v steamcmd >/dev/null 2>&1; then
+    STEAMCMD_BIN="$(command -v steamcmd)"
+    log "Using SteamCMD from PATH: ${STEAMCMD_BIN}"
+    return
+  fi
   if [[ -x "${STEAMCMD_DIR}/steamcmd.sh" ]]; then
+    STEAMCMD_BIN="${STEAMCMD_DIR}/steamcmd.sh"
     log "SteamCMD already installed in ${STEAMCMD_DIR}"
     return
   fi
+
+  # The bundled tarball is Linux-only; never silently install anything on macOS.
+  [[ $IS_MACOS -eq 0 ]] || die "SteamCMD not found. Install it first:
+       brew install --cask steamcmd"
+
   log "Installing SteamCMD into ${STEAMCMD_DIR}"
   mkdir -p "${STEAMCMD_DIR}"
   fetch "${WORK_DIR}/steamcmd.tar.gz" "${STEAMCMD_URL}"
   tar -xzf "${WORK_DIR}/steamcmd.tar.gz" -C "${STEAMCMD_DIR}"
+  STEAMCMD_BIN="${STEAMCMD_DIR}/steamcmd.sh"
 }
 
 # 4. Base game files (HLDS app 90, steam_legacy branch) ---------------------
 download_game() {
+  [[ -n "${STEAMCMD_BIN}" ]] || install_steamcmd
+
+  # On macOS SteamCMD would fetch the macOS build of app 90; force the Linux one,
+  # since the server always runs on Linux.
+  local -a platform_args=()
+  if [[ $IS_MACOS -eq 1 ]]; then
+    platform_args=(+@sSteamCmdForcePlatformType linux)
+    log "macOS host: forcing Linux platform files"
+  fi
+
   log "Downloading CS 1.6 server files via SteamCMD (branch: ${STEAM_APP_BRANCH})"
   log "This takes a while on the first run and needs several passes."
 
@@ -95,7 +151,8 @@ download_game() {
   for attempt in 1 2 3 4 5; do
     log "SteamCMD pass ${attempt}/5"
     # HLDS is known to need repeated app_update runs before everything lands.
-    "${STEAMCMD_DIR}/steamcmd.sh" \
+    "${STEAMCMD_BIN}" \
+      "${platform_args[@]}" \
       +force_install_dir "${SERVER_DIR}" \
       +login anonymous \
       +app_set_config 90 mod cstrike \
@@ -104,6 +161,12 @@ download_game() {
 
     if grep -q "Success! App '90' fully installed" "${WORK_DIR}/steamcmd.log"; then
       log "SteamCMD reports app 90 fully installed"
+      local got
+      got="$(manifest_field "${SERVER_DIR}" buildid)"
+      if [[ -n "$got" && "$got" != "${GAME_BUILDID}" ]]; then
+        warn "app 90 is build ${got}, but versions.env pins ${GAME_BUILDID}."
+        warn "The ${STEAM_APP_BRANCH} branch moved — re-pin GAME_BUILDID deliberately."
+      fi
       return
     fi
     tail -3 "${WORK_DIR}/steamcmd.log" >&2 || true
@@ -112,9 +175,9 @@ download_game() {
   [[ -f "${SERVER_DIR}/hlds_run" ]] || {
     cp "${WORK_DIR}/steamcmd.log" /tmp/steamcmd-failed.log 2>/dev/null || true
     die "SteamCMD never completed; log copied to /tmp/steamcmd-failed.log.
-     A segfault in 'Loading Steam API' means you are on an emulated x86 host
-     (e.g. an i386 container on Apple Silicon), which this stack does not
-     support — run it on real x86_64 hardware."
+     A segfault in 'Loading Steam API' means SteamCMD is being emulated (an x86
+     container on Apple Silicon, say). Run this step on the host instead — that
+     is what fetch.sh is for — or on real x86_64 hardware."
   }
   warn "SteamCMD did not print the success line, but hlds_run exists — continuing."
 }
@@ -123,9 +186,46 @@ download_game() {
 # GAME_SRC should be a Linux HLDS install (app 90). A *client* install works
 # only as a source of map/model content: it has no libsteam_api.so and the
 # engine refuses to start without it — see the warning at the end of this step.
+# Read app 90's build id and branch out of a SteamCMD install directory.
+# Prints nothing when the manifest is absent — a GAME_SRC copy excludes
+# steamapps/ — and must not fail the script under `set -o pipefail`.
+manifest_field() {  # manifest_field <dir> <key>
+  { sed -nE "s/.*\"$2\"[[:space:]]+\"([^\"]+)\".*/\1/p" \
+      "$1/steamapps/appmanifest_90.acf" 2>/dev/null || true; } | head -1
+}
+
+# A wrong GAME_SRC (client install, half-copied directory, anniversary build)
+# produces an image that only fails much later, so refuse it up front.
+check_game_src() {
+  if [[ -n "${SKIP_GAME_CHECK:-}" ]]; then
+    warn "SKIP_GAME_CHECK set — not validating ${GAME_SRC}"
+    return 0
+  fi
+
+  local manifest="${GAME_SRC}/steamapps/appmanifest_90.acf"
+  [[ -f "$manifest" ]] || die "No steamapps/appmanifest_90.acf in ${GAME_SRC}.
+     GAME_SRC must be a Linux HLDS install made by SteamCMD (app 90), not a game
+     client. Set SKIP_GAME_CHECK=1 to bypass this check."
+
+  local buildid branch
+  buildid="$(manifest_field "${GAME_SRC}" buildid)"
+  branch="$(manifest_field "${GAME_SRC}" BetaKey)"
+
+  [[ "$branch" == "${STEAM_APP_BRANCH}" ]] ||
+    die "GAME_SRC is on branch '${branch:-<none>}', expected '${STEAM_APP_BRANCH}'.
+     ReHLDS only runs the pre-anniversary engine (build <= 8684)."
+  [[ "$buildid" == "${GAME_BUILDID}" ]] ||
+    die "GAME_SRC is app 90 build ${buildid:-<unknown>}, expected ${GAME_BUILDID}.
+     Re-run SteamCMD against ${GAME_SRC}, or re-pin GAME_BUILDID in versions.env
+     if the branch really did move."
+
+  log "GAME_SRC manifest OK: app 90 build ${buildid} (${branch})"
+}
+
 copy_game_from_src() {
   log "Seeding game files from ${GAME_SRC} (SteamCMD skipped)"
   [[ -d "${GAME_SRC}/cstrike" ]] || die "GAME_SRC must contain a cstrike/ directory"
+  check_game_src
 
   mkdir -p "${SERVER_DIR}"
   # Everything except client-side, Windows and per-install state. Server
@@ -194,7 +294,7 @@ install_rehlds() {
   done
   chmod +x "${SERVER_DIR}/hlds_linux"
   [[ -f "${SERVER_DIR}/valve/dlls/director.so" ]] ||
-    install -Dm755 "${bin}/valve/dlls/director.so" "${SERVER_DIR}/valve/dlls/director.so"
+    install_file 755 "${bin}/valve/dlls/director.so" "${SERVER_DIR}/valve/dlls/director.so"
 }
 
 # 7. ReGameDLL_CS ----------------------------------------------------------
@@ -207,7 +307,7 @@ install_regamedll() {
   local src="${WORK_DIR}/regamedll/bin/linux32/cstrike"
   [[ -f "${src}/dlls/cs.so" ]] || die "cs.so not found inside the ReGameDLL archive"
   backup_once "${CSTRIKE_DIR}/dlls/cs.so" "orig-valve"
-  install -Dm755 "${src}/dlls/cs.so" "${CSTRIKE_DIR}/dlls/cs.so"
+  install_file 755 "${src}/dlls/cs.so" "${CSTRIKE_DIR}/dlls/cs.so"
   # game.cfg and delta.lst must match the game DLL; game_init.cfg is replaced
   # by ours further down (it is where bot_enable has to live).
   cp "${src}/game.cfg" "${src}/delta.lst" "${CSTRIKE_DIR}/"
@@ -245,7 +345,7 @@ install_reunion() {
   log "Installing ReUnion ${REUNION_VERSION}"
   fetch "${WORK_DIR}/reunion.zip" "${REUNION_URL}"
   unzip -qo "${WORK_DIR}/reunion.zip" -d "${WORK_DIR}/reunion"
-  install -Dm755 "${WORK_DIR}/reunion/bin/Linux/reunion_mm_i386.so" \
+  install_file 755 "${WORK_DIR}/reunion/bin/Linux/reunion_mm_i386.so" \
     "${CSTRIKE_DIR}/addons/reunion/reunion_mm_i386.so"
 
   local cfg="${CSTRIKE_DIR}/reunion.cfg"
@@ -270,7 +370,7 @@ install_reunion() {
 
   # Defaults reject non-Steam clients (cid_* = 5). 3 = give them a STEAM_ id
   # derived from their IP, which is what lets the Xash3D client connect.
-  sed -i -E \
+  sed_i -E \
     -e "s|^[[:space:]]*cid_NoSteam48[[:space:]]*=.*|cid_NoSteam48 = 3|" \
     -e "s|^[[:space:]]*cid_NoSteam47[[:space:]]*=.*|cid_NoSteam47 = 3|" \
     -e "s|^[[:space:]]*SteamIdHashSalt[[:space:]]*=.*|SteamIdHashSalt = ${salt}|" \
@@ -341,7 +441,7 @@ patch_liblist() {
   fi
   log "Pointing liblist.gam gamedll_linux at Metamod"
   backup_once "$gam" "orig"
-  sed -i -E 's|^gamedll_linux[[:space:]]+".*"|gamedll_linux "addons/metamod/metamod_i386.so"|' "$gam"
+  sed_i -E 's|^gamedll_linux[[:space:]]+".*"|gamedll_linux "addons/metamod/metamod_i386.so"|' "$gam"
   grep -q 'gamedll_linux "addons/metamod/metamod_i386.so"' "$gam" ||
     printf 'gamedll_linux "addons/metamod/metamod_i386.so"\n' >> "$gam"
 }
@@ -365,14 +465,38 @@ install_configs() {
     log "Kept the existing rcon password"
   fi
 
-  install -Dm644 "${SCRIPT_DIR}/cfg/server.cfg"    "${CSTRIKE_DIR}/server.cfg"
-  install -Dm644 "${SCRIPT_DIR}/cfg/bots.cfg"      "${CSTRIKE_DIR}/bots.cfg"
-  install -Dm644 "${SCRIPT_DIR}/cfg/game_init.cfg" "${CSTRIKE_DIR}/game_init.cfg"
-  install -Dm644 "${SCRIPT_DIR}/cfg/mapcycle.txt"  "${CSTRIKE_DIR}/mapcycle.txt"
-  install -Dm644 "${SCRIPT_DIR}/cfg/plugins.ini"   "${CSTRIKE_DIR}/addons/metamod/plugins.ini"
+  install_file 644 "${SCRIPT_DIR}/cfg/server.cfg"    "${CSTRIKE_DIR}/server.cfg"
+  install_file 644 "${SCRIPT_DIR}/cfg/bots.cfg"      "${CSTRIKE_DIR}/bots.cfg"
+  install_file 644 "${SCRIPT_DIR}/cfg/game_init.cfg" "${CSTRIKE_DIR}/game_init.cfg"
+  install_file 644 "${SCRIPT_DIR}/cfg/mapcycle.txt"  "${CSTRIKE_DIR}/mapcycle.txt"
+  install_file 644 "${SCRIPT_DIR}/cfg/plugins.ini"   "${CSTRIKE_DIR}/addons/metamod/plugins.ini"
 
-  [[ -n "${NO_SECRETS:-}" ]] || sed -i "s|__RCON_PASSWORD__|${rcon}|" "${CSTRIKE_DIR}/server.cfg"
+  [[ -n "${NO_SECRETS:-}" ]] || sed_i "s|__RCON_PASSWORD__|${rcon}|" "${CSTRIKE_DIR}/server.cfg"
   RCON_PASSWORD="$rcon"
+}
+
+# 13b. Record what went into this install ----------------------------------
+# Lets anyone trace a running server (or a published image) back to exact
+# component versions: cat ${SERVER_DIR}/BUILD_INFO
+write_build_info() {
+  local info="${SERVER_DIR}/BUILD_INFO"
+  local game_build
+  game_build="$(manifest_field "${SERVER_DIR}" buildid)"
+  [[ -n "$game_build" ]] || game_build="${GAME_BUILDID} (from GAME_SRC pin)"
+
+  {
+    echo "built_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    echo "game_app=90"
+    echo "game_branch=${STEAM_APP_BRANCH}"
+    echo "game_buildid=${game_build}"
+    echo "rehlds=${REHLDS_VERSION}"
+    echo "regamedll=${REGAMEDLL_VERSION}"
+    echo "metamod_r=${METAMOD_VERSION}"
+    echo "reapi=${REAPI_VERSION}"
+    echo "reunion=${REUNION_VERSION}"
+    echo "amxmodx=${AMXX_VERSION}"
+  } > "$info"
+  log "Wrote ${info}"
 }
 
 # 14. zBot needs navigation meshes -----------------------------------------
@@ -393,28 +517,87 @@ check_nav() {
   warn "  scp ~/Games/cs16/cstrike/maps/*.nav <server>:${CSTRIKE_DIR}/maps/"
 }
 
+ALL_STEPS=(deps game engine addons configs)
+
+usage() {
+  cat >&2 <<EOF
+Usage: install.sh [step ...]
+
+With no arguments every step runs, in order. Naming steps runs only those — the
+Docker build uses this to keep each phase in its own cache layer.
+
+  deps     apt packages and i386 multi-arch
+  game     game files: SteamCMD app 90, or GAME_SRC when that is set
+  engine   ReHLDS, ReGameDLL_CS, zBot profiles
+  addons   Metamod-R, ReUnion, AMX Mod X, ReAPI
+  configs  custom plugins, liblist.gam patch, cfg files, .nav check
+
+See the header of this file for the environment variables.
+EOF
+  exit "${1:-2}"
+}
+
+run_step() {
+  case "$1" in
+    deps)
+      install_deps
+      ;;
+    game)
+      if [[ -n "${GAME_SRC:-}" ]]; then
+        copy_game_from_src
+      else
+        install_steamcmd
+        download_game
+      fi
+      ;;
+    engine)
+      install_rehlds
+      install_regamedll
+      install_bot_profiles
+      ;;
+    addons)
+      install_metamod
+      install_reunion
+      install_amxx
+      install_reapi
+      ;;
+    configs)
+      install_plugins
+      patch_liblist
+      install_configs
+      write_build_info
+      check_nav
+      ;;
+    *)
+      warn "unknown step: $1"
+      usage 2
+      ;;
+  esac
+}
+
 main() {
-  install_deps
-  if [[ -n "${GAME_SRC:-}" ]]; then
-    copy_game_from_src
-  else
-    install_steamcmd
-    download_game
+  case "${1:-}" in
+    -h|--help) usage 0 ;;
+  esac
+
+  local steps=("$@") full=0
+  if [[ ${#steps[@]} -eq 0 ]]; then
+    steps=("${ALL_STEPS[@]}")
+    full=1
   fi
-  install_rehlds
-  install_regamedll
-  install_bot_profiles
-  install_metamod
-  install_reunion
-  install_amxx
-  install_reapi
-  install_plugins
-  patch_liblist
-  install_configs
-  check_nav
+
+  local step
+  for step in "${steps[@]}"; do
+    run_step "$step"
+  done
+
+  if [[ $full -eq 0 ]]; then
+    log "Done: ${steps[*]}"
+    return
+  fi
 
   log "Done. Server installed in ${SERVER_DIR}"
-  log "rcon password: ${RCON_PASSWORD}"
+  log "rcon password: ${RCON_PASSWORD:-<unchanged>}"
   echo
   echo "Start it with:"
   echo "  ${SCRIPT_DIR}/start.sh"

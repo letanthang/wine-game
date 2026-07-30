@@ -1,10 +1,11 @@
 # Build the self-contained CS 1.6 ReHLDS server image and publish it to Docker Hub.
 #
-# This is what makes the whole thing usable from an Apple Silicon Mac: the image
-# is linux/amd64 (with 32-bit multi-arch inside, since GoldSrc is i386-only) and
-# can only be built on x86_64, which is exactly what GitHub's ubuntu-latest
-# runners are. The Mac never builds or runs it — it just pulls on the target
-# server.
+# Two steps, the same ones a developer runs locally:
+#   1. fetch.sh assembles local/server-files/ (SteamCMD + the ReHLDS stack)
+#   2. docker/Dockerfile packages that tree — no downloads during the build
+#
+# ubuntu-latest is x86_64, so SteamCMD runs natively and the resulting image can
+# also be smoke-tested here, which is not possible on an Apple Silicon Mac.
 #
 # Publishing needs two repository secrets. Without them the workflow still builds
 # and smoke-tests the image locally, it just does not push:
@@ -43,6 +44,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Step 1 output: ~870 MB of Valve game files plus the assembled tree. The
+      # steam_legacy branch is frozen, so this cache almost always hits; the key
+      # changes only when a pinned version does.
+      - name: Cache server files
+        id: server-files
+        uses: actions/cache@v4
+        with:
+          path: games/counter-strike/rehlds/local/server-files
+          key: cs16-server-files-${{ hashFiles('games/counter-strike/rehlds/versions.env') }}
+
+      - name: Step 1 — fetch and assemble server files
+        if: steps.server-files.outputs.cache-hit != 'true'
+        working-directory: games/counter-strike/rehlds
+        run: ./fetch.sh
+
       - uses: docker/setup-buildx-action@v3
 
       - name: Log in to Docker Hub
@@ -63,7 +79,7 @@ jobs:
             type=ref,event=tag
             type=ref,event=pr
 
-      - name: Build (and push when the Docker Hub secrets are set)
+      - name: Step 2 — build the image (and push when the secrets are set)
         uses: docker/build-push-action@v6
         with:
           context: games/counter-strike/rehlds

@@ -19,6 +19,9 @@ SETUP_DIR="${SETUP_DIR:-/opt/rehlds-setup}"
 random_string() { head -c "${1:-24}" /dev/urandom | base64 | tr -d '/+=' | head -c "${2:-20}"; }
 
 if [[ ! -f "${SERVER_DIR}/cstrike/dlls/cs.so" ]]; then
+  # Normally impossible: the image ships the server. This only happens when an
+  # empty volume is mounted over ${SERVER_DIR}, and the install then needs
+  # network access and a real x86_64 host for SteamCMD.
   echo "==> ${SERVER_DIR} is empty (mounted volume?) — installing the server now"
   SKIP_DEPS=1 "${SETUP_DIR}/install.sh"
 fi

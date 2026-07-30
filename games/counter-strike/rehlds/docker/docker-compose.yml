@@ -1,13 +1,13 @@
 # CS 1.6 ReHLDS server.
 #
-# Requires an x86_64 host (Debian VPS, Intel Mac, CI). It does not work on Apple
-# Silicon: the binaries inside are 32-bit x86, Rosetta only emulates x86_64, and
-# under QEMU Valve's engine crashes — see README.md.
+# Requires an x86_64 host to RUN (Debian VPS, Intel Mac, CI). It does not work on
+# Apple Silicon: the binaries inside are 32-bit x86, Rosetta only emulates
+# x86_64, and under QEMU Valve's engine crashes — see README.md.
 #
 # Two ways to use it:
-#   docker compose up --build     build the image here (needs the repo)
+#   ../fetch.sh && docker compose up --build   build here (step 1 then step 2)
 #   CS16_IMAGE=docker.io/<user>/cs16-rehlds:latest docker compose up
-#                                 run the image CI published, no build
+#                                              run a published image, no build
 name: cs16-rehlds
 
 services:

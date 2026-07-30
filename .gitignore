@@ -1,0 +1,7 @@
+/.vscode
+/.idea
+.DS_Store
+
+# Step 1 output: ~870 MB of Valve game files plus the assembled server tree.
+# Rebuild it with `make fetch` in games/counter-strike/rehlds/.
+games/counter-strike/rehlds/local/

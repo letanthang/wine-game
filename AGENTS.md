@@ -4,8 +4,11 @@ This file provides guidance to Codex (Codex.ai/code) when working with code in t
 
 ## Language convention
 
-- Converse with the user in **Vietnamese**.
-- Write all documentation, code comments, scripts, and commit messages in **English**.
+- **Conversation with the user is in Vietnamese**, with occasional English mixed in
+  (technical terms, quoted output, the odd sentence) — that is normal, keep answering in
+  Vietnamese.
+- **Everything written into the repo is in English, without exception**: code, comments,
+  scripts, documentation, README files, config comments, and commit messages.
 
 ## What this project is
 
