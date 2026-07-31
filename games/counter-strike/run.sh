@@ -34,14 +34,23 @@ sync_bots_cfg() {
     sed -i '' -E "s/^bot_quota .*/bot_quota ${BOTS}/" "$dst"
   fi
 
-  # listenserver.cfg runs on listen servers, server.cfg on dedicated ones.
-  local cfg
-  for cfg in "${CSTRIKE_DIR}/listenserver.cfg" "${CSTRIKE_DIR}/server.cfg"; do
-    [[ -f "$cfg" ]] || continue
-    grep -q '^exec bots.cfg' "$cfg" && continue
+  # Only listen servers get the bots: on -dedicated the game DLL never registers
+  # the bot commands, so server.cfg exec'ing bots.cfg would only print a screen
+  # of "Unknown command" warnings (verified 2026-07-31, see README).
+  local cfg="${CSTRIKE_DIR}/listenserver.cfg"
+  if [[ -f "$cfg" ]] && ! grep -q '^exec bots.cfg' "$cfg"; then
     [[ -f "${cfg}.orig-no-bots" ]] || cp "$cfg" "${cfg}.orig-no-bots"
     print "\n// bot settings (installed by games/counter-strike/run.sh)\nexec bots.cfg" >> "$cfg"
-  done
+  fi
+
+  # Drop the exec line earlier versions of this script appended to server.cfg.
+  local server_cfg="${CSTRIKE_DIR}/server.cfg"
+  if [[ -f "$server_cfg" ]] && grep -q '^exec bots.cfg' "$server_cfg"; then
+    sed -i '' \
+      -e '\|^// bot settings (installed by games/counter-strike/run.sh)$|d' \
+      -e '/^exec bots.cfg$/d' \
+      "$server_cfg"
+  fi
 }
 
 sync_bots_cfg

@@ -1,6 +1,6 @@
 # Wine setup helpers. See README.md for details.
 
-.PHONY: install prefix counter-strike counter-strike-offline counter-strike-server
+.PHONY: install prefix counter-strike counter-strike-offline counter-strike-dedicated counter-strike-server
 
 # Install Wine (Gcenx build), winetricks, and PATH setup in one shot
 install:
@@ -21,6 +21,18 @@ counter-strike:
 # Bot settings live in games/counter-strike/bots.cfg.
 counter-strike-offline:
 	BOTS=$(or $(BOTS),8) games/counter-strike/run.sh +map $(or $(MAP),de_dust2) $(ARGS)
+
+# Run the Xash3D engine itself as a headless dedicated server. Only Xash3D /
+# CS16Client clients can join it, and it has no bots and no Metamod/AMXX — see
+# "Dedicated server" in games/counter-strike/README.md before using this.
+# Usage:
+#   make counter-strike-dedicated                                      # de_dust2, 12 slots, :27015
+#   make counter-strike-dedicated MAP=cs_office PORT=27016 MAXPLAYERS=16
+counter-strike-dedicated:
+	games/counter-strike/run.sh -dedicated \
+		-port $(or $(PORT),27015) \
+		+maxplayers $(or $(MAXPLAYERS),12) \
+		+map $(or $(MAP),de_dust2) $(ARGS)
 
 # Build the CS 1.6 ReHLDS dedicated server image, in two steps:
 #   1. fetch  — download and assemble the server files on this host

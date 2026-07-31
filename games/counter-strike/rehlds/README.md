@@ -416,13 +416,33 @@ commands (`bot_add`, `bot_kick`, …) are documented in
 [`../README.md`](../README.md#console-commands-press--in-game).
 
 **Navigation meshes.** zBot needs `cstrike/maps/<map>.nav`. The SteamCMD download
-does **not** include them (verified 2026-07-28: 25 maps, zero `.nav`), so zBot
-generates one the first time it plays a map — several minutes of CPU per map.
-`install.sh` warns when none are found. Much faster to copy them from the Mac
-client, which has all 27:
+does **not** include them (verified 2026-07-28: 25 maps, zero `.nav`), so the
+server prints `Failed to load 'maps/<map>.nav'` on first boot and zBot analyses
+the map itself — several minutes of CPU, once per map, after which the `.nav` is
+saved and reused.
+
+Letting it do that is the recommended route. The `.nav` files in the Xash3D
+client look like an obvious shortcut, but they are **not** interchangeable here:
+the map files are byte-identical between that client and Valve's server download
+(checked on `de_dust2`, same SHA256), yet the client still reports
+`The AI navigation data is from a different version of this map` — so those
+meshes are the mismatched part, and copying them would trade "no nav" for "wrong
+nav" and worse bot pathing.
+
+Once a server has generated good meshes, copy them back so future images ship
+with them:
 
 ```sh
-scp ~/Games/cs16/cstrike/maps/*.nav <server>:~/cs16-server/cstrike/maps/
+scp <server>:~/cs16-server/cstrike/maps/*.nav local/server-files/cstrike/maps/
+make build
+```
+
+`install.sh` (and therefore `fetch.sh`) also takes `NAV_SRC=<dir>` and copies
+`*.nav` from there when the game files have none — useful once you have a set
+you trust:
+
+```sh
+NAV_SRC=/path/to/good/navs ./fetch.sh
 ```
 
 ## What has been verified so far

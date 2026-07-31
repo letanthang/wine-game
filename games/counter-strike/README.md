@@ -55,13 +55,54 @@ Runs `./xash3d -console -game cstrike` from `~/Games/cs16` (`-console` enables
 the developer console). Add `-windowed` for windowed mode. For an offline match
 against bots, see [Bots](#bots) below.
 
-## Dedicated server (Debian)
+## Dedicated server
 
-This macOS build is **client-only**: `-dedicated` runs, but the game DLL refuses
-to register the bot commands there (see [Bots only work on a listen
-server](#bots-only-work-on-a-listen-server)), and it is an arm64 client build.
+### Xash3D's own `-dedicated` mode
 
-To host a real server, use the ReHLDS stack on Debian:
+The engine has a real headless server mode and it works on this Mac:
+
+```sh
+make counter-strike-dedicated                                      # de_dust2, 12 slots, :27015
+make counter-strike-dedicated MAP=cs_office PORT=27016 MAXPLAYERS=16
+```
+
+Verified 2026-07-31 — it loads the ReGameDLL game module and starts listening:
+
+```
+Dll loaded for game "Counter-Strike"
+ReGameDLL version: 5.30.0.848-dev
+Server IPv4 address 127.0.0.1:27015
+12 player server started
+```
+
+No window, no client; it reads `server.cfg`, `maps/<map>_load.cfg` and
+`game.cfg` like any GoldSrc dedicated server. The address it prints is only the
+loopback one — `lsof` confirms the socket is `UDP *:27015`, i.e. reachable from
+the LAN. Stop it with `Ctrl-C` (or `kill <pid>`).
+
+What it does **not** give you:
+
+- **No bots.** Every `bot_*` command comes back `Unknown command` —
+  `UTIL_AreBotsAllowed` needs `bot_enable > 0` at game-DLL init, which cannot be
+  set that early on a dedicated server. See [Bots only work on a listen
+  server](#bots-only-work-on-a-listen-server). An empty dedicated server stays
+  empty until humans join.
+- **No Metamod / AMX Mod X** — both are Windows x86 DLLs, so no admin commands,
+  stats or plugins.
+- **Only Xash3D clients can connect.** Xash3D's GoldSrc protocol 48 support is
+  one-way: this *client* can join Valve servers, but a stock CS 1.6 client
+  cannot join this *server*.
+- **A few cvars do not exist** in this engine and are simply skipped from
+  `server.cfg`: `sv_pausable`, `sv_consistency`, `sv_voicecodec`,
+  `sv_filetransfercompression`, `sv_lan_rate`, `mp_allowspectators`. The absence
+  of `sv_consistency` in particular means no client-file consistency checking.
+
+So it is fine for LAN games between Xash3D clients and for testing maps or
+configs, and not usable as a public server.
+
+### A real server: ReHLDS on Debian
+
+To host a server that retail CS 1.6 clients can join, use the ReHLDS stack:
 [`rehlds/README.md`](rehlds/README.md) — ReHLDS + ReGameDLL_CS + Metamod-R +
 ReUnion + AMX Mod X + zBot, one-shot `install.sh`, a systemd unit, and a
 `linux/amd64` Docker image (`make counter-strike-server`) for x86_64 hosts — that
