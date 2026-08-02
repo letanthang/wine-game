@@ -13,6 +13,38 @@ Steam/Sikarugir notes in `games/steam-counter-strike/` are no longer used for
 this game and are kept only as a recipe for future Steam titles. General
 rationale for preferring native engines: `docs/03-native-engines.md`.
 
+## Requirements
+
+An Apple Silicon (arm64) Mac running **macOS 26.0 or newer**. The floor comes
+from the CS16Client binaries, not from the engine — measured on this install
+2026-07-31 with `LC_BUILD_VERSION`:
+
+| Component | Files | Minimum macOS |
+| --- | --- | --- |
+| Xash3D FWGS engine | `xash3d`, `libxash.dylib`, `libmenu.dylib` | 14.8 |
+| CS16Client | `cstrike/cl_dlls/menu_arm64.dylib`, `cstrike/cl_dlls/client_arm64.dylib`, `cstrike/dlls/cs_arm64.dylib` | 26.0 |
+
+Check the target machine, and re-check the binaries after replacing either half:
+
+```sh
+sw_vers -productVersion
+otool -l ~/Games/cs16/cstrike/cl_dlls/menu_arm64.dylib | grep -A3 LC_BUILD_VERSION
+```
+
+On an older macOS the failure is easy to misread as a missing file: the engine
+itself starts normally (it only needs 14.8), but `dlopen` refuses the CS16Client
+menu library, so `gameui.hInstance` is never set and the game reports `native
+object "MenuFactory" is unavailable`. Copying a working `~/Games/cs16` from a
+newer Mac does not help — the deployment target travels with the binaries.
+
+The fix is to raise the OS on that machine, or to build CS16Client from source
+there (<https://github.com/Velaron/cs16-client>) so its deployment target follows
+the local SDK.
+
+Note that the engine half is downloaded from the **rolling `continuous` tag**
+(see [Setup](#setup-how-gamescs16-was-assembled)), so a fresh download is not
+necessarily the 14.8 build these numbers were taken from.
+
 ## Why not Wine (post-mortem, 2026-07-20)
 
 Every Wine variant on this machine crashes the GoldSrc engine a few seconds
@@ -51,9 +83,91 @@ make counter-strike                    # or: games/counter-strike/run.sh
 make counter-strike ARGS="-windowed"   # extra args pass through
 ```
 
-Runs `./xash3d -console -game cstrike` from `~/Games/cs16` (`-console` enables
-the developer console). Add `-windowed` for windowed mode. For an offline match
+Both go through `~/Games/cs16/play.sh`, which runs
+`./xash3d -console -game cstrike` from the game folder (`-console` enables the
+developer console). Add `-windowed` for windowed mode. For an offline match
 against bots, see [Bots](#bots) below.
+
+## The install is standalone
+
+`~/Games/cs16` does not depend on this repo at runtime. Everything needed to
+play lives in the folder:
+
+```
+~/Games/cs16/
+  play.sh                     the launcher, resolves its own location
+  README.txt                  player-facing notes
+  cstrike/bots.cfg            bot settings, hand-editable
+  Counter-Strike 1.6.app      double-click; a wrapper around play.sh
+```
+
+Install or refresh it with:
+
+```sh
+make counter-strike-standalone                      # + Counter-Strike 1.6.app
+make counter-strike-standalone OFFLINE=1            # "(Bots).app" → straight into de_dust2
+make counter-strike-standalone OFFLINE=1 MAP=cs_office
+make counter-strike-standalone ARGS=--reset-bots    # restore this repo's bots.cfg
+```
+
+The repo is the **generator**, not a dependency: delete it and the game still
+starts. `run.sh` here is a thin forwarder to the installed `play.sh`, so there
+is one launch path instead of two that can drift.
+
+### The folder is portable
+
+Rename it, move it to another disk, or copy it to another Mac — `play.sh` uses
+its own directory, and the app walks up from its bundle path to find the game
+folder, so no absolute path is baked in. `Contents/Resources/game-dir` records
+one anyway, used only if the app itself is dragged out of the game folder.
+
+Two things matter when moving it to another Mac, both spelled out in the
+installed `README.txt`: copy it as a **zip** (FAT/exFAT drops the executable
+bits), and clear the quarantine flag afterwards —
+`xattr -dr com.apple.quarantine <folder>` — because these binaries are not
+signed by an identified developer.
+
+### The app
+
+A real `.app` bundle: Finder icon from `cstrike/game.ico`, no terminal window,
+draggable to the Dock, findable in Spotlight. Both variants can coexist; they
+use different bundle identifiers.
+
+- Finder gives the process no terminal, so **everything the engine prints goes
+  to `~/Library/Logs/counter-strike-16.log`**, overwritten on each launch. That
+  is the first place to look when the app "does nothing".
+- Env-var overrides such as `BOTS=12` have no place to be typed, so the app uses
+  whatever `cstrike/bots.cfg` currently says.
+- The icon is upscaled from a 32×32 `.ico`, so it looks soft at large sizes —
+  that is the only art the game ships. `LSMinimumSystemVersion` is 14.0 (the
+  engine's floor) rather than the CS16Client floor of 26.0, so the bundle does
+  not block a locally rebuilt client; see [Requirements](#requirements).
+
+### bots.cfg belongs to the install
+
+`~/Games/cs16/cstrike/bots.cfg` is the source of truth for bot settings. Edit it
+directly; nothing overwrites it — the installer only puts the repo's template
+there when the file is absent, or when `--reset-bots` is passed. `BOTS=<n>`
+rewrites its `bot_quota` line **persistently**, so the count sticks until it is
+changed again.
+
+Verified 2026-08-01: double-clicking the app starts the engine (`CS16Client
+ver. 3911 initialized`) with no terminal window.
+
+## Portable Windows build
+
+The same three ingredients (Xash3D FWGS + CS16Client + these assets) also exist
+as Windows x86 binaries, so a ready-to-run folder for a Windows PC can be built
+from this Mac:
+
+```sh
+make counter-strike-windows ZIP=1     # ~/Games/cs16-windows{,.zip}
+```
+
+Copy it over, run `play.bat` — no installer, no Steam, no Wine. Confirmed
+running well on Windows 2026-08-01. Details,
+including why it must be 32-bit and why `liblist.gam` points at `dlls\mp.dll`
+there instead of `dlls\cs.dll`: [`windows/README.md`](windows/README.md).
 
 ## Dedicated server
 
@@ -118,17 +232,17 @@ Zero. Nothing else is needed: no Metamod, no YaPB, and the install already has
 
 ### 8 bots join automatically — this is intentional
 
-Any listen server started from this repo's launcher gets **8 bots without
-asking**: `run.sh` installs `bots.cfg` and makes `listenserver.cfg` exec it, and
-`listenserver.cfg` runs on every map start — including a plain
-`make counter-strike` followed by **Create Game** in the menu. `bot_quota 8` +
+Any listen server gets **8 bots without asking**: the installer put `bots.cfg`
+in `cstrike/` and made `listenserver.cfg` exec it, and `listenserver.cfg` runs
+on every map start — including a plain `make counter-strike` (or a double-click)
+followed by **Create Game** in the menu. `bot_quota 8` +
 `bot_join_after_player 0` in `bots.cfg` is what pulls them in.
 
 To play without bots, either run `bot_quota 0` / `bot_kick` in the console, or
-launch with `BOTS=0`:
+set the quota to zero once:
 
 ```sh
-BOTS=0 games/counter-strike/run.sh     # no bots this session
+BOTS=0 make counter-strike     # and every launch after it, until changed again
 ```
 
 ### Console commands (press `~` in game)
@@ -154,7 +268,7 @@ quota — lower `bot_quota` first if you want fewer of them for good.
 
 Changes made in the console last until the map changes — `listenserver.cfg`
 re-execs `bots.cfg` and restores the defaults. To make a change permanent, edit
-`games/counter-strike/bots.cfg` in this repo (see below).
+`~/Games/cs16/cstrike/bots.cfg` (see below).
 
 ### Start a match against bots in one command
 
@@ -165,12 +279,14 @@ make counter-strike-offline MAP=cs_office BOTS=12
 
 ### Persistent settings
 
-`games/counter-strike/bots.cfg` in this repo is the source of truth. `run.sh`
-copies it into `~/Games/cs16/cstrike/` on every launch and appends an
-`exec bots.cfg` line to `listenserver.cfg` / `server.cfg` once (originals
-backed up as `*.orig-no-bots`). Edit the repo copy to change defaults; use
-`BOTS=<n>` to override the bot count for a single launch — `run.sh` rewrites
-the `bot_quota` line in the installed copy.
+`~/Games/cs16/cstrike/bots.cfg` is the source of truth — edit it directly.
+Nothing overwrites it: `install-standalone.sh` only copies this repo's
+`games/counter-strike/bots.cfg` template there when the file is absent, or when
+`--reset-bots` is passed, and it appends the `exec bots.cfg` line to
+`listenserver.cfg` once (original backed up as `listenserver.cfg.orig-no-bots`).
+
+`BOTS=<n>` rewrites the `bot_quota` line in that file, so it is a **persistent**
+change rather than a per-launch override.
 
 ### Bots only work on a listen server
 

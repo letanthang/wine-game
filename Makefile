@@ -1,6 +1,6 @@
 # Wine setup helpers. See README.md for details.
 
-.PHONY: install prefix counter-strike counter-strike-offline counter-strike-dedicated counter-strike-server
+.PHONY: install prefix counter-strike counter-strike-offline counter-strike-dedicated counter-strike-server counter-strike-windows counter-strike-standalone
 
 # Install Wine (Gcenx build), winetricks, and PATH setup in one shot
 install:
@@ -41,6 +41,28 @@ counter-strike-dedicated:
 # x86_64 host. See games/counter-strike/rehlds/README.md.
 counter-strike-server:
 	$(MAKE) -C games/counter-strike/rehlds all
+
+# Make ~/Games/cs16 a standalone install: a play.sh launcher, a double-clickable
+# Counter-Strike 1.6.app and a README, none of which need this repo afterwards.
+# Safe to re-run; it leaves cstrike/bots.cfg alone.
+# Usage:
+#   make counter-strike-standalone                      # ~/Games/cs16/Counter-Strike 1.6.app
+#   make counter-strike-standalone OFFLINE=1            # "(Bots).app", straight into de_dust2
+#   make counter-strike-standalone OFFLINE=1 MAP=cs_office
+#   make counter-strike-standalone ARGS=--reset-bots    # restore this repo's bots.cfg
+counter-strike-standalone:
+	games/counter-strike/install-standalone.sh $(if $(OFFLINE),--offline $(MAP)) $(ARGS)
+
+# Assemble a portable Windows build of CS 1.6 on Xash3D into ~/Games/cs16-windows.
+# Copy the folder (or the zip) to a Windows PC and run play.bat — no installer.
+# Usage:
+#   make counter-strike-windows                 # full package, ~822 MB
+#   make counter-strike-windows ZIP=1           # plus ~/Games/cs16-windows.zip
+#   make counter-strike-windows SLIM=1 ZIP=1    # without the Half-Life valve/ assets
+# See games/counter-strike/windows/README.md.
+counter-strike-windows:
+	games/counter-strike/windows/build.sh --force \
+		$(if $(SLIM),--slim) $(if $(ZIP),--zip) $(if $(REFRESH),--refresh) $(ARGS)
 
 # Create a 64-bit Wine prefix for a game under ~/wine-prefixes/<GAME>.
 # Usage:
