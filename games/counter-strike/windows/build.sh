@@ -8,7 +8,7 @@
 # The package is three parts glued together:
 #   1. Xash3D FWGS engine  — win32-i386 build from the rolling `continuous` tag
 #   2. CS16Client          — Windows X86 build (client.dll / menu.dll / mp.dll)
-#   3. Game assets         — copied from the local ~/Games/cs16 install
+#   3. Game assets         — copied from the local ~/Games/assets install
 #
 # Everything is 32-bit x86: CS16Client publishes no 64-bit Windows binaries, so
 # the engine must match it.
@@ -18,7 +18,7 @@ set -euo pipefail
 SCRIPT_DIR="${0:A:h}"
 REPO_GAME_DIR="${SCRIPT_DIR:h}"
 
-SRC_DIR="${SRC:-${HOME}/Games/cs16}"
+SRC_DIR="${SRC:-${HOME}/Games/assets}"
 OUT_DIR="${OUT:-${HOME}/Games/cs16-windows}"
 CACHE_DIR="${CACHE:-${HOME}/Games/.cache/cs16-windows}"
 
@@ -43,7 +43,7 @@ Options:
   -h, --help   show this help
 
 Environment:
-  SRC=<dir>    source install to take assets from (default ~/Games/cs16)
+  SRC=<dir>    source install to take assets from (default ~/Games/assets)
   OUT=<dir>    output folder            (default ~/Games/cs16-windows)
   CACHE=<dir>  download cache           (default ~/Games/.cache/cs16-windows)
 EOF

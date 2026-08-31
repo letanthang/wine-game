@@ -7,11 +7,11 @@
 # path rather than two that can drift apart.
 #
 # No Wine involved — see README.md for why the Wine route was abandoned and how
-# ~/Games/cs16 was assembled.
+# ~/Games/cs16-mac was assembled.
 
 set -euo pipefail
 
-GAME_DIR="${GAME_DIR:-${HOME}/Games/cs16}"
+GAME_DIR="${GAME_DIR:-${HOME}/Games/cs16-mac}"
 PLAY_SH="${GAME_DIR}/play.sh"
 
 if [[ ! -x "$PLAY_SH" ]]; then

@@ -1,6 +1,6 @@
 # Wine setup helpers. See README.md for details.
 
-.PHONY: install prefix counter-strike counter-strike-offline counter-strike-dedicated counter-strike-server counter-strike-windows counter-strike-standalone
+.PHONY: install prefix counter-strike counter-strike-offline counter-strike-dedicated counter-strike-server counter-strike-windows counter-strike-standalone counter-strike-mac
 
 # Install Wine (Gcenx build), winetricks, and PATH setup in one shot
 install:
@@ -42,11 +42,22 @@ counter-strike-dedicated:
 counter-strike-server:
 	$(MAKE) -C games/counter-strike/rehlds all
 
-# Make ~/Games/cs16 a standalone install: a play.sh launcher, a double-clickable
+# Assemble ~/Games/cs16-mac from scratch: the Xash3D FWGS arm64 engine and
+# CS16Client are downloaded, the game assets come from a local install
+# (~/Games/assets), and install-standalone.sh finishes the folder off.
+# Usage:
+#   make counter-strike-mac                 # full build, then the standalone install
+#   make counter-strike-mac ARGS=--force    # overwrite an existing ~/Games/cs16-mac
+#   make counter-strike-mac ARGS=--slim     # skip the 430 MB valve/ assets
+#   make counter-strike-mac SRC=~/Games/assets
+counter-strike-mac:
+	$(if $(SRC),SRC=$(SRC) )games/counter-strike/mac/build.sh $(ARGS)
+
+# Make ~/Games/cs16-mac a standalone install: a play.sh launcher, a double-clickable
 # Counter-Strike 1.6.app and a README, none of which need this repo afterwards.
 # Safe to re-run; it leaves cstrike/bots.cfg alone.
 # Usage:
-#   make counter-strike-standalone                      # ~/Games/cs16/Counter-Strike 1.6.app
+#   make counter-strike-standalone                      # ~/Games/cs16-mac/Counter-Strike 1.6.app
 #   make counter-strike-standalone OFFLINE=1            # "(Bots).app", straight into de_dust2
 #   make counter-strike-standalone OFFLINE=1 MAP=cs_office
 #   make counter-strike-standalone ARGS=--reset-bots    # restore this repo's bots.cfg

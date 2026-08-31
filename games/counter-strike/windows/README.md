@@ -5,9 +5,9 @@ Xash3D FWGS engine: copy it to a Windows PC, run `play.bat`, done. No
 installer, no Steam, no Wine, no registry entries.
 
 The script runs on this Mac and takes the game assets from the local
-`~/Games/cs16` install (the native arm64 build documented in
-[`../README.md`](../README.md)), pairing them with the **Windows** engine and
-client binaries downloaded from upstream.
+`~/Games/assets` install (the same source the [macOS build](../mac/README.md)
+uses), pairing them with the **Windows** engine and client binaries downloaded
+from upstream.
 
 ## Build it
 
@@ -31,7 +31,7 @@ games/counter-strike/windows/build.sh --help
 | `--force` | overwrite an existing output folder |
 
 `SRC=`, `OUT=` and `CACHE=` override the source install, the output folder and
-the download cache (`~/Games/cs16`, `~/Games/cs16-windows`,
+the download cache (`~/Games/assets`, `~/Games/cs16-windows`,
 `~/Games/.cache/cs16-windows`).
 
 ## Everything is 32-bit x86 — this is forced

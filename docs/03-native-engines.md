@@ -22,7 +22,8 @@ Full per-game notes: [games/counter-strike/README.md](../games/counter-strike/RE
 - **Game logic:** [CS16Client](https://github.com/Velaron/cs16-client) — arm64
   `client`/`server` dylibs plus bundled YaPB bots for offline play.
 - **Assets:** copied from a Windows CS 1.6 install (unpacked with
-  `innoextract`), assembled at `~/Games/cs16`.
+  `innoextract`, kept at `~/Games/assets`), assembled into `~/Games/cs16-mac`
+  by `make counter-strike-mac`.
 - **Launcher:** `games/counter-strike/run.sh`, or `make counter-strike`.
 - **Bots:** the CZ bots built into ReGameDLL (`bot_add`, `bot_quota`), configured
   by `games/counter-strike/bots.cfg`; listen server only. Details in the game
@@ -58,8 +59,8 @@ cannot be worked around from the Wine side.
 - **Multiplayer compatibility.** Xash3D FWGS speaks GoldSrc protocol 48 well
   enough for most community servers, but servers with strict anti-cheat may
   reject non-GoldSrc clients. LAN play between Xash3D clients is fine.
-- **Manual updates.** Re-download the engine and client archives and re-extract
-  over `~/Games/cs16`; assets do not change.
+- **Updates.** `make counter-strike-mac ARGS="--refresh --force"` re-downloads
+  the engine and client and rebuilds the folder; the assets do not change.
 
 ## Other native engines worth checking before reaching for Wine
 

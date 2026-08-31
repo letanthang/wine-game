@@ -5,9 +5,10 @@
 # ~/Library/Logs/counter-strike-16.log and hard failures are reported through a
 # Finder alert. Launching itself is play.sh's job; this is only the wrapper.
 #
-# The file is static: the game folder is derived from the bundle's own path, and
-# the optional map to boot into comes from Contents/Resources/launch-args. That
-# is what lets the whole game folder be moved or copied to another Mac.
+# The file is static and holds no absolute path: the game folder is derived from
+# the bundle's own path, and the optional map to boot into comes from
+# Contents/Resources/launch-args. That is what lets the whole game folder be
+# moved or copied to another Mac.
 #
 # Source: games/counter-strike/app-launcher.sh in the wine-game repo, installed
 # here by install-standalone.sh.
@@ -27,14 +28,27 @@ mkdir -p "${LOG:h}"
 print -- "=== $(date '+%Y-%m-%d %H:%M:%S') launch ===" > "$LOG"
 exec >>"$LOG" 2>&1
 
+# A folder counts as an install if it has the launcher or at least the engine.
+is_game_dir() { [[ -x "${1}/play.sh" || -x "${1}/xash3d" ]] }
+
 # Normal case: the app sits in the game folder. If it was moved out (dragged
-# into /Applications, say), fall back to the path recorded at install time.
-if [[ ! -x "${GAME_DIR}/play.sh" ]]; then
-  recorded="${CONTENTS_DIR}/Resources/game-dir"
-  if [[ -f "$recorded" ]]; then
-    print -- "not in a game folder, using the recorded path"
-    GAME_DIR="$(cat "$recorded")"
-  fi
+# into /Applications, say), try the location recorded at install time and then
+# the default install path. The recorded path is stored relative to the home
+# directory ("~/Games/cs16-mac"), so it still resolves under a different user name
+# on another Mac; only a game folder outside $HOME is recorded absolute.
+if ! is_game_dir "$GAME_DIR"; then
+  candidates=()
+  recorded_file="${CONTENTS_DIR}/Resources/game-dir"
+  [[ -f "$recorded_file" ]] && candidates+=("${$(<"$recorded_file")/#\~/$HOME}")
+  candidates+=("${HOME}/Games/cs16-mac")
+
+  print -- "not in a game folder, looking for the install"
+  for candidate in "${candidates[@]}"; do
+    if [[ -n "$candidate" ]] && is_game_dir "$candidate"; then
+      GAME_DIR="$candidate"
+      break
+    fi
+  done
 fi
 
 launch_args=()

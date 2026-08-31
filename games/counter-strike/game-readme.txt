@@ -46,12 +46,18 @@ bits and the game will not start afterwards.
 
 macOS quarantines anything that arrives by download or AirDrop, and these
 binaries are not signed by an identified developer, so the first launch will be
-blocked. Clear the quarantine flag on the whole folder once:
+blocked. Run this once in a terminal, from inside the folder:
+
+  ./remove-quarantine.sh
+
+If the executable bit was lost on the way over, run it as: zsh
+remove-quarantine.sh. It clears the flag from the whole folder, which is the
+same as:
 
   xattr -dr com.apple.quarantine "/path/to/this/folder"
 
 Right-click the app and choose Open also works, but has to be repeated for each
-blocked binary, so the command above is easier.
+blocked binary, so the script above is easier.
 
 Troubleshooting
 ---------------

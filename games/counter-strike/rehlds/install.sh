@@ -514,7 +514,7 @@ check_nav() {
   fi
   warn "No .nav files in cstrike/maps — zBot will generate one on first use of"
   warn "each map (slow). Copy them from a client install, e.g. on the Mac:"
-  warn "  scp ~/Games/cs16/cstrike/maps/*.nav <server>:${CSTRIKE_DIR}/maps/"
+  warn "  scp ~/Games/cs16-mac/cstrike/maps/*.nav <server>:${CSTRIKE_DIR}/maps/"
 }
 
 ALL_STEPS=(deps game engine addons configs)

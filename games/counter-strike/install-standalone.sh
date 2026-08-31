@@ -1,5 +1,5 @@
 #!/bin/zsh
-# Turn ~/Games/cs16 into a standalone CS 1.6 install: a play.sh launcher, a
+# Turn ~/Games/cs16-mac into a standalone CS 1.6 install: a play.sh launcher, a
 # double-clickable .app, bot settings and a player-facing README, none of which
 # reference this repo at runtime. The game folder can then be renamed, moved or
 # copied to another Mac and still work, and this repo can be deleted.
@@ -17,7 +17,7 @@ set -euo pipefail
 
 SCRIPT_DIR="${0:A:h}"
 
-GAME_DIR="${GAME_DIR:-${HOME}/Games/cs16}"
+GAME_DIR="${GAME_DIR:-${HOME}/Games/cs16-mac}"
 OFFLINE_MAP=""
 RESET_BOTS=0
 
@@ -34,7 +34,7 @@ Options:
   -h, --help       show this help
 
 Environment:
-  GAME_DIR=<dir>   game install    (default ~/Games/cs16)
+  GAME_DIR=<dir>   game install    (default ~/Games/cs16-mac)
   APP=<path>       bundle to write (default <GAME_DIR>/Counter-Strike 1.6.app)
 EOF
 }
@@ -60,13 +60,25 @@ info() { print -P "%F{cyan}==>%f $*"; }
 warn() { print -P "%F{yellow}warning:%f $*" >&2; }
 die()  { print -P "%F{red}error:%f $*" >&2; exit 1; }
 
-[[ -d "$GAME_DIR" ]] || die "no such directory: ${GAME_DIR}"
+# A missing game folder is created rather than refused: the engine and the game
+# assets can be unpacked into it afterwards (see README.md, Setup).
+CREATED_GAME_DIR=0
+if [[ ! -d "$GAME_DIR" ]]; then
+  info "Creating ${GAME_DIR}"
+  mkdir -p "$GAME_DIR" || die "could not create ${GAME_DIR}"
+  CREATED_GAME_DIR=1
+fi
 GAME_DIR="${GAME_DIR:A}"
 CSTRIKE_DIR="${GAME_DIR}/cstrike"
 
-[[ -x "${GAME_DIR}/xash3d" ]] || die "xash3d engine not found in ${GAME_DIR} — see README.md (Setup)"
+# Without the engine there is nothing to launch, so stop here — but do not leave
+# an empty folder behind if this run is what created it.
+if [[ ! -x "${GAME_DIR}/xash3d" ]]; then
+  (( CREATED_GAME_DIR )) && rmdir "$GAME_DIR" 2>/dev/null
+  die "xash3d engine not found in ${GAME_DIR} — unpack the engine and the game files there first, see README.md (Setup)"
+fi
 
-for f in play.sh app-launcher.sh game-readme.txt bots.cfg; do
+for f in play.sh app-launcher.sh remove-quarantine.sh game-readme.txt bots.cfg; do
   [[ -f "${SCRIPT_DIR}/${f}" ]] || die "${f} is missing next to this script"
 done
 
@@ -75,6 +87,11 @@ done
 info "Installing play.sh and README.txt into ${GAME_DIR}"
 install -m 755 "${SCRIPT_DIR}/play.sh" "${GAME_DIR}/play.sh"
 install -m 644 "${SCRIPT_DIR}/game-readme.txt" "${GAME_DIR}/README.txt"
+
+# Travels with the folder: after a copy to another Mac everything here is
+# quarantined again, and this is what the player runs to unblock it.
+info "Installing remove-quarantine.sh"
+install -m 755 "${SCRIPT_DIR}/remove-quarantine.sh" "${GAME_DIR}/remove-quarantine.sh"
 
 # --- bot settings ------------------------------------------------------------
 
@@ -136,8 +153,12 @@ mkdir -p "${APP_PATH}/Contents/MacOS" "${APP_PATH}/Contents/Resources"
 install -m 755 "${SCRIPT_DIR}/app-launcher.sh" "${APP_PATH}/Contents/MacOS/counter-strike"
 
 # Only used if the app is moved out of the game folder; normally the launcher
-# works out the game dir from its own location.
-print -- "$GAME_DIR" > "${APP_PATH}/Contents/Resources/game-dir"
+# works out the game dir from its own location. Recorded relative to the home
+# directory when it sits under it, so the fallback keeps working after the game
+# folder is copied to another Mac with a different user name.
+RECORDED_DIR="$GAME_DIR"
+[[ "$RECORDED_DIR" == "${HOME}"/* ]] && RECORDED_DIR="~${RECORDED_DIR#$HOME}"
+print -- "$RECORDED_DIR" > "${APP_PATH}/Contents/Resources/game-dir"
 
 [[ -n "$OFFLINE_MAP" ]] && print -- "+map ${OFFLINE_MAP}" > "${APP_PATH}/Contents/Resources/launch-args"
 
@@ -234,6 +255,14 @@ plutil -lint "${APP_PATH}/Contents/Info.plist" >/dev/null || die "generated Info
 # Finder caches bundle metadata by mtime; touching the bundle makes it pick up
 # the new icon straight away instead of after a relaunch.
 touch "$APP_PATH"
+
+# --- quarantine --------------------------------------------------------------
+
+# Matters when this runs over a folder that arrived by download or AirDrop: the
+# engine and the client dylibs are unsigned, and Gatekeeper refuses to start
+# them while the flag is set. A folder built locally has nothing to clear.
+"${SCRIPT_DIR}/remove-quarantine.sh" "$GAME_DIR" || \
+  warn "could not clear the quarantine flag — run ${GAME_DIR}/remove-quarantine.sh by hand"
 
 info "Done: ${GAME_DIR} is now standalone"
 if [[ -n "$OFFLINE_MAP" ]]; then

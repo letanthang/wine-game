@@ -1,11 +1,11 @@
 # Counter-Strike 1.6 (standalone, native via Xash3D)
 
 - **Runs via:** Xash3D FWGS engine, **native Apple Silicon arm64 — no Wine**
-- **Install location:** `~/Games/cs16`
+- **Install location:** `~/Games/cs16-mac` (built by `make counter-strike-mac`)
 - **Client:** CS16Client (arm64)
 - **Bots:** the CZ bots built into `dlls/cs_arm64.dylib` (ReGameDLL) — see
   [Bots](#bots); the bundled YaPB dylib is unused
-- **Assets:** extracted from the user's CS 1.6 WaRzOnE installer
+- **Assets:** `~/Games/assets`, extracted from the user's CS 1.6 WaRzOnE installer
 - **Fonts/locale:** none needed.
 
 This is **the** route for CS 1.6 in this project (decided 2026-07-20). The
@@ -28,13 +28,13 @@ Check the target machine, and re-check the binaries after replacing either half:
 
 ```sh
 sw_vers -productVersion
-otool -l ~/Games/cs16/cstrike/cl_dlls/menu_arm64.dylib | grep -A3 LC_BUILD_VERSION
+otool -l ~/Games/cs16-mac/cstrike/cl_dlls/menu_arm64.dylib | grep -A3 LC_BUILD_VERSION
 ```
 
 On an older macOS the failure is easy to misread as a missing file: the engine
 itself starts normally (it only needs 14.8), but `dlopen` refuses the CS16Client
 menu library, so `gameui.hInstance` is never set and the game reports `native
-object "MenuFactory" is unavailable`. Copying a working `~/Games/cs16` from a
+object "MenuFactory" is unavailable`. Copying a working `~/Games/cs16-mac` from a
 newer Mac does not help — the deployment target travels with the binaries.
 
 The fix is to raise the OS on that machine, or to build CS16Client from source
@@ -63,18 +63,27 @@ but both macOS 32-on-64 approaches validate exception frames against the
 thread's original stack limits and refuse to dispatch. Conclusion: **GoldSrc
 does not run under Wine on modern macOS — use the native engine instead.**
 
-## Setup (how ~/Games/cs16 was assembled)
+## Setup (how ~/Games/cs16-mac is assembled)
+
+```sh
+make counter-strike-mac              # or: games/counter-strike/mac/build.sh
+```
+
+The three parts, glued together by [`mac/build.sh`](mac/build.sh):
 
 1. Engine — Xash3D FWGS macOS arm64 build:
    <https://github.com/FWGS/xash3d-fwgs/releases> (`continuous` tag,
-   `xash3d-fwgs-apple-arm64.tar.xz`), extracted into `~/Games/cs16`.
+   `xash3d-fwgs-apple-arm64.tar.xz`), extracted into `~/Games/cs16-mac`.
 2. CS client — CS16Client macOS arm64:
    <https://github.com/Velaron/cs16-client/releases>
    (`CS16Client-macOS-arm64.zip`), unzipped over the same dir (provides
    `cstrike/cl_dlls/client_arm64.dylib`, `dlls/cs_arm64.dylib`, YaPB bots).
-3. Game assets — `valve/` and `cstrike/` folders copied from the WaRzOnE
-   install (itself unpacked with `innoextract`, see git history), *without*
-   overwriting the arm64 dylibs (`cp -Rn`).
+3. Game assets — `valve/` and `cstrike/` copied from `~/Games/assets`, the
+   WaRzOnE install unpacked with `innoextract` (see git history), *without*
+   overwriting the arm64 binaries (`rsync --ignore-existing`).
+
+`install-standalone.sh` then finishes the folder off. Details and flags in
+[`mac/README.md`](mac/README.md).
 
 ## Play
 
@@ -83,19 +92,20 @@ make counter-strike                    # or: games/counter-strike/run.sh
 make counter-strike ARGS="-windowed"   # extra args pass through
 ```
 
-Both go through `~/Games/cs16/play.sh`, which runs
+Both go through `~/Games/cs16-mac/play.sh`, which runs
 `./xash3d -console -game cstrike` from the game folder (`-console` enables the
 developer console). Add `-windowed` for windowed mode. For an offline match
 against bots, see [Bots](#bots) below.
 
 ## The install is standalone
 
-`~/Games/cs16` does not depend on this repo at runtime. Everything needed to
+`~/Games/cs16-mac` does not depend on this repo at runtime. Everything needed to
 play lives in the folder:
 
 ```
-~/Games/cs16/
+~/Games/cs16-mac/
   play.sh                     the launcher, resolves its own location
+  remove-quarantine.sh        unblocks the folder after a copy to another Mac
   README.txt                  player-facing notes
   cstrike/bots.cfg            bot settings, hand-editable
   Counter-Strike 1.6.app      double-click; a wrapper around play.sh
@@ -118,14 +128,17 @@ is one launch path instead of two that can drift.
 
 Rename it, move it to another disk, or copy it to another Mac — `play.sh` uses
 its own directory, and the app walks up from its bundle path to find the game
-folder, so no absolute path is baked in. `Contents/Resources/game-dir` records
-one anyway, used only if the app itself is dragged out of the game folder.
+folder, so no absolute path is baked in. If the app itself is dragged out of the
+game folder it falls back to `Contents/Resources/game-dir` and then to
+`~/Games/cs16-mac`; that record is home-relative (`~/Games/cs16-mac`), so it also
+resolves under a different user name on another Mac. Only a game folder outside
+the home directory is recorded as an absolute path.
 
 Two things matter when moving it to another Mac, both spelled out in the
 installed `README.txt`: copy it as a **zip** (FAT/exFAT drops the executable
-bits), and clear the quarantine flag afterwards —
-`xattr -dr com.apple.quarantine <folder>` — because these binaries are not
-signed by an identified developer.
+bits), and run `./remove-quarantine.sh` in the folder afterwards (it is installed
+alongside `play.sh`) — because these binaries are not signed by an identified
+developer and Gatekeeper blocks them while `com.apple.quarantine` is set.
 
 ### The app
 
@@ -145,7 +158,7 @@ use different bundle identifiers.
 
 ### bots.cfg belongs to the install
 
-`~/Games/cs16/cstrike/bots.cfg` is the source of truth for bot settings. Edit it
+`~/Games/cs16-mac/cstrike/bots.cfg` is the source of truth for bot settings. Edit it
 directly; nothing overwrites it — the installer only puts the repo's template
 there when the file is absent, or when `--reset-bots` is passed. `BOTS=<n>`
 rewrites its `bot_quota` line **persistently**, so the count sticks until it is
@@ -268,7 +281,7 @@ quota — lower `bot_quota` first if you want fewer of them for good.
 
 Changes made in the console last until the map changes — `listenserver.cfg`
 re-execs `bots.cfg` and restores the defaults. To make a change permanent, edit
-`~/Games/cs16/cstrike/bots.cfg` (see below).
+`~/Games/cs16-mac/cstrike/bots.cfg` (see below).
 
 ### Start a match against bots in one command
 
@@ -279,7 +292,7 @@ make counter-strike-offline MAP=cs_office BOTS=12
 
 ### Persistent settings
 
-`~/Games/cs16/cstrike/bots.cfg` is the source of truth — edit it directly.
+`~/Games/cs16-mac/cstrike/bots.cfg` is the source of truth — edit it directly.
 Nothing overwrites it: `install-standalone.sh` only copies this repo's
 `games/counter-strike/bots.cfg` template there when the file is absent, or when
 `--reset-bots` is passed, and it appends the `exec bots.cfg` line to
@@ -335,7 +348,7 @@ hosting is disabled (fixed 2026-07-20). Verified via a dedicated-server test
 and only failed on `bind: Address already in use` — i.e. the gamedll itself
 loaded fine.
 
-Fix: edit `~/Games/cs16/cstrike/liblist.gam`, change
+Fix: edit `~/Games/cs16-mac/cstrike/liblist.gam`, change
 
 ```
 gamedll "addons\metamod\dlls\metamod.dll"
