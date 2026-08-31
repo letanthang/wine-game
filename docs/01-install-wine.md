@@ -82,3 +82,25 @@ The Gcenx build does not auto-update. To upgrade: download the newer
 `wine-stable-*.tar.xz` release, delete the old `/Applications/Wine Stable.app`,
 and extract the new one in its place. Prefixes are stored separately under
 `~/wine-prefixes/` and survive the swap.
+
+## Removing Wine
+
+```sh
+make uninstall                  # asks first
+make uninstall ARGS=--dry-run   # plan only
+```
+
+`scripts/uninstall.sh` reverses sections 2–4 of this document: it deletes
+`/Applications/Wine Stable.app`, uninstalls the `winetricks` and `cabextract`
+formulae (skipping one another installed formula still needs) and strips the
+PATH line from `~/.zshrc`, backing that file up first.
+
+It stops there on purpose. Rosetta 2 belongs to macOS, not to this setup;
+`~/wine-prefixes/` holds the installed games and everything saved inside them;
+and `~/Games/` is native builds that never used Wine at all. All three are
+listed at the end of the run so it is clear what remains. A `WINEPREFIX` or
+`WINEARCH` you exported by hand in `~/.zshrc` (section 4) is reported rather
+than deleted — the script only removes lines it put there itself.
+
+Removing Wine makes every prefix under `~/wine-prefixes/` unusable until Wine is
+installed again, so check what is in there first.

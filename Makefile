@@ -1,10 +1,20 @@
 # Wine setup helpers. See README.md for details.
 
-.PHONY: install prefix counter-strike counter-strike-offline counter-strike-dedicated counter-strike-server counter-strike-windows counter-strike-standalone counter-strike-mac
+.PHONY: install uninstall prefix counter-strike counter-strike-offline counter-strike-dedicated counter-strike-server counter-strike-windows counter-strike-standalone counter-strike-mac counter-strike-vendor
 
 # Install Wine (Gcenx build), winetricks, and PATH setup in one shot
 install:
 	zsh scripts/install.sh
+
+# Undo `make install`: remove Wine Stable.app, the winetricks/cabextract Homebrew
+# formulae and the Wine PATH line in ~/.zshrc. Wine prefixes (~/wine-prefixes),
+# ~/Games and Rosetta 2 are kept — it prints what is left afterwards.
+# Usage:
+#   make uninstall              show the plan, ask, then remove
+#   make uninstall ARGS=--dry-run
+#   make uninstall ARGS=--yes   no prompt
+uninstall:
+	zsh scripts/uninstall.sh $(ARGS)
 
 # Launch Counter-Strike 1.6 (native Xash3D build, see games/counter-strike/).
 # Usage:
@@ -63,6 +73,17 @@ counter-strike-mac:
 #   make counter-strike-standalone ARGS=--reset-bots    # restore this repo's bots.cfg
 counter-strike-standalone:
 	games/counter-strike/install-standalone.sh $(if $(OFFLINE),--offline $(MAP)) $(ARGS)
+
+# Copy every non-system library ~/Games/cs16-mac links against into the folder
+# itself, so it also runs on a Mac without Homebrew. build.sh already does this;
+# this target repairs a folder that was assembled before it did. It has to run on
+# a Mac that HAS the libraries (this one), not on the machine that is missing
+# them. See "Portability: vendored libraries" in games/counter-strike/README.md.
+# Usage:
+#   make counter-strike-vendor
+#   make counter-strike-vendor GAME_DIR=~/Games/cs16-mac-copy
+counter-strike-vendor:
+	games/counter-strike/mac/vendor-dylibs.sh $(if $(GAME_DIR),$(GAME_DIR))
 
 # Assemble a portable Windows build of CS 1.6 on Xash3D into ~/Games/cs16-windows.
 # Copy the folder (or the zip) to a Windows PC and run play.bat — no installer.

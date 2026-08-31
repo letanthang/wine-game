@@ -2,10 +2,13 @@
 # Assemble a ready-to-play macOS arm64 build of Counter-Strike 1.6 on Xash3D
 # FWGS, the way windows/build.sh does it for Windows.
 #
-# The package is three parts glued together:
+# The package is four parts glued together:
 #   1. Xash3D FWGS engine  — apple-arm64 build from the rolling `continuous` tag
 #   2. CS16Client          — macOS arm64 build (client/menu/cs/yapb dylibs)
 #   3. Game assets         — copied from a local install (default ~/Games/assets)
+#   4. Vendored libraries  — the non-system dylibs CS16Client links against,
+#                            copied in by vendor-dylibs.sh so the folder runs
+#                            on a Mac without Homebrew
 #
 # The asset source is a plain CS 1.6 install: only its cstrike/ and valve/
 # folders are read, and only for files the engine and CS16Client did not already
@@ -119,6 +122,15 @@ unzip -q -o "$CLIENT_ARCHIVE" -d "$OUT_DIR"
 [[ -f "$OUT_DIR/cstrike/dlls/cs_arm64.dylib" ]]   || die "CS16Client cs_arm64.dylib missing after extraction"
 
 chmod +x "$OUT_DIR/xash3d"
+
+# CS16Client's released menu library links against Homebrew's freetype by
+# absolute path, which exists on this machine and on no machine that merely
+# receives the folder. Left alone, the copy loads on nothing but the build
+# machine: dlopen fails, the game reports `native object "MenuFactory" is
+# unavailable` and the engine silently falls back to its own menu. Vendoring the
+# library into the build is what makes "self-contained" true.
+info "Vendoring non-system libraries into the build"
+"${SCRIPT_DIR}/vendor-dylibs.sh" "$OUT_DIR"
 
 # --- 3. game assets ----------------------------------------------------------
 

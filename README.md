@@ -37,6 +37,25 @@ make install        # runs scripts/install.sh; safe to re-run
 This performs steps 1–4 below (Rosetta check, Wine download, winetricks,
 PATH in `~/.zshrc`). The manual steps follow if you prefer to run them yourself.
 
+### Removing it again
+
+```sh
+make uninstall                  # asks before it touches anything
+make uninstall ARGS=--dry-run   # just show the plan
+```
+
+`scripts/uninstall.sh` undoes exactly what the one-shot install did: it deletes
+`/Applications/Wine Stable.app`, uninstalls the `winetricks` and `cabextract`
+formulae (skipping either one another installed formula still depends on) and
+removes the PATH line from `~/.zshrc`, keeping a timestamped backup of the file.
+
+It deliberately does **not** touch Rosetta 2, `~/wine-prefixes` or `~/Games`, and
+prints what is still on disk so nothing is removed by surprise. Wine variables
+you added to `~/.zshrc` by hand — a global `WINEPREFIX`, say — are reported, not
+deleted. Note that `~/Games` survives on its own merits: the native
+Counter-Strike builds use no Wine, and since `vendor-dylibs.sh` they do not need
+Homebrew either.
+
 ### 1. Verify Rosetta 2
 
 ```sh

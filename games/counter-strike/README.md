@@ -45,6 +45,51 @@ Note that the engine half is downloaded from the **rolling `continuous` tag**
 (see [Setup](#setup-how-gamescs16-was-assembled)), so a fresh download is not
 necessarily the 14.8 build these numbers were taken from.
 
+## Portability: vendored libraries (2026-08-31)
+
+The same `MenuFactory` error has a second cause that has nothing to do with the
+OS version, and it is the one actually hit in practice. CS16Client's released
+`menu_arm64.dylib` links against **Homebrew's** freetype by absolute path:
+
+```
+cstrike/cl_dlls/menu_arm64.dylib -> /opt/homebrew/opt/freetype/lib/libfreetype.6.dylib
+                                 -> /opt/homebrew/opt/libpng/lib/libpng16.16.dylib
+```
+
+That path exists on the machine the build is assembled on, because Homebrew is
+installed here for winetricks, and on no machine that merely receives the
+folder. `client_arm64.dylib` and `cs_arm64.dylib` have no such dependency, which
+is what makes the symptom confusing: the game starts, ReGameDLL loads, a map
+loads, and only the CS16Client UI is missing — the engine falls back to its own
+`libmenu.dylib`, whose **Training and Load game entries are greyed out** because
+CS is `multiplayer_only`. That greyed-out menu is the quickest way to recognise
+the failure from across the room.
+
+`mac/vendor-dylibs.sh` fixes it: it walks the load commands of every binary in
+the build, copies each library from outside `/usr/lib` and `/System` next to the
+binary that needs it, repoints the reference at `@loader_path` and re-signs
+ad-hoc (arm64 refuses a Mach-O whose signature no longer matches its load
+commands). `build.sh` runs it on every build, so a fresh package needs nothing;
+an already-assembled folder is repaired in place:
+
+```sh
+games/counter-strike/mac/vendor-dylibs.sh ~/Games/cs16-mac
+```
+
+It ends by re-scanning the whole build and failing if anything still points
+outside, so a clean run is the proof. Note it reads the load commands with
+`otool -l`, not `otool -L`: the first line `otool -L` prints for a dylib is the
+file's own `LC_ID_DYLIB`, which for these binaries is the path on the CI machine
+that built them (`/Users/runner/work/xash3d-fwgs/...`). Rewriting that as if it
+were a dependency corrupts the engine and SDL2 binaries.
+
+To check a build by hand, or to confirm a copy on another Mac:
+
+```sh
+cd ~/Games/cs16-mac
+otool -L cstrike/cl_dlls/menu_arm64.dylib   # no /opt/homebrew paths
+```
+
 ## Why not Wine (post-mortem, 2026-07-20)
 
 Every Wine variant on this machine crashes the GoldSrc engine a few seconds

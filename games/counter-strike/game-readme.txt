@@ -67,6 +67,12 @@ Double-clicking the app does nothing visible: everything it prints goes to
 
 which is overwritten on every launch. The last lines say what went wrong.
 
+The menu looks like Half-Life's and "Training" and "Load game" are greyed out:
+the CS16Client menu library did not load, and the engine fell back to its own
+menu. The log says the native object "MenuFactory" is unavailable. This package
+was assembled without the libraries CS16Client needs copied into it, so it only
+runs on the Mac that built it - ask for a rebuilt copy.
+
 The multiplayer browser works (Xash3D speaks GoldSrc protocol 48), but servers
 with strict anti-cheat may reject a non-GoldSrc client. LAN play between Xash3D
 clients is fine.
