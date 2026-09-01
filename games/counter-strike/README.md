@@ -135,6 +135,20 @@ Installed 2026-09-01:
 both use case-insensitive filesystems by default; on a case-sensitive volume, or
 on a Linux server built from these assets, that map would lose its sky.
 
+`cs_mansion` asks for `city`, and that one lives in `valve/gfx/env/city*.tga` —
+`cstrike/` only has the unrelated `city1*`. **Do not rebuild with `--slim` while
+this map is installed**: that flag skips the Half-Life `valve/` assets, and the
+map then loads with no sky at all. `--slim` is safe for `aim_map`, whose skybox
+is on the `cstrike/` side.
+
+A rebuild otherwise keeps every map: `add-map.sh` puts them in `~/Games/assets`,
+and nothing in build.sh's exclude list touches `.bsp`, `.res`, `.txt`,
+`overviews/` or `maps.lst`. Verified by running build.sh's own rsync invocation
+against an empty target — all 13 files of the four maps, plus `maps.lst`, are in
+the transfer list. Remember the flag, though: plain `make counter-strike-mac`
+refuses to overwrite an existing install, so a rebuild is
+`make counter-strike-mac ARGS=--force`.
+
 ### Navigation meshes for the bots
 
 Map archives do not carry `maps/<map>.nav`, and without one the console prints
