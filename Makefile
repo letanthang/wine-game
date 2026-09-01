@@ -1,6 +1,6 @@
 # Wine setup helpers. See README.md for details.
 
-.PHONY: install uninstall prefix counter-strike counter-strike-offline counter-strike-dedicated counter-strike-server counter-strike-windows counter-strike-standalone counter-strike-mac counter-strike-vendor
+.PHONY: install uninstall prefix counter-strike counter-strike-offline counter-strike-dedicated counter-strike-server counter-strike-windows counter-strike-standalone counter-strike-mac counter-strike-vendor counter-strike-add-map counter-strike-nav
 
 # Install Wine (Gcenx build), winetricks, and PATH setup in one shot
 install:
@@ -73,6 +73,33 @@ counter-strike-mac:
 #   make counter-strike-standalone ARGS=--reset-bots    # restore this repo's bots.cfg
 counter-strike-standalone:
 	games/counter-strike/install-standalone.sh $(if $(OFFLINE),--offline $(MAP)) $(ARGS)
+
+# Add custom maps to the CS 1.6 asset source (~/Games/assets) and to every build
+# on this machine. Installing into the asset source is what makes a map survive
+# `make counter-strike-mac ARGS=--force`. Only files the install does not already
+# have are copied, so a map archive's copy of the base game's wads is ignored.
+# Usage:
+#   make counter-strike-add-map MAPS="cs_mansion aim_ak-colt"
+#   make counter-strike-add-map MAPS=cs_mansion ARGS=--dry-run
+counter-strike-add-map:
+ifndef MAPS
+	$(error MAPS is required, e.g. make counter-strike-add-map MAPS=cs_mansion)
+endif
+	games/counter-strike/add-map.sh $(ARGS) $(MAPS)
+
+# Generate the maps/<map>.nav mesh the CZ bots need for a map that shipped
+# without one. Opens the game and runs ReGameDLL's bot_nav_analyze, which takes
+# from seconds to several minutes per map.
+# MUST be run from a terminal: the engine reads console commands from stdin and
+# quits on its own when stdin is not a tty, so `make ... &` or a CI job fails.
+# Usage:
+#   make counter-strike-nav MAPS=cs_mansion
+#   make counter-strike-nav MAPS="cs_mansion aim_ak-colt" ARGS="--timeout 900"
+counter-strike-nav:
+ifndef MAPS
+	$(error MAPS is required, e.g. make counter-strike-nav MAPS=cs_mansion)
+endif
+	games/counter-strike/mac/make-nav.sh $(ARGS) $(MAPS)
 
 # Copy every non-system library ~/Games/cs16-mac links against into the folder
 # itself, so it also runs on a Mac without Homebrew. build.sh already does this;

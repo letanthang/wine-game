@@ -90,6 +90,81 @@ cd ~/Games/cs16-mac
 otool -L cstrike/cl_dlls/menu_arm64.dylib   # no /opt/homebrew paths
 ```
 
+## Custom maps
+
+`add-map.sh` installs a map from the [DS-Servers](https://en.ds-servers.com/maps/goldsrc/cstrike/)
+archive mirror:
+
+```sh
+make counter-strike-add-map MAPS="cs_mansion aim_ak-colt"
+games/counter-strike/add-map.sh --dry-run cs_mansion     # look first
+```
+
+Two things about it are deliberate.
+
+**It installs into `~/Games/assets` first**, then tops up `~/Games/cs16-mac` and
+`~/Games/cs16-windows` from the same files. `assets/` is what both builds copy
+from, so a map added there survives `make counter-strike-mac ARGS=--force`,
+while a `.bsp` dropped straight into `cs16-mac/` is deleted by the next rebuild.
+
+**It only copies files the install does not already have**, checking `cstrike/`
+*and* `valve/` before each one. Map archives routinely ship the whole base
+game's wads — `cs_mansion.zip` carries `cstrike.wad`, `decals.wad`,
+`liquids.wad`, `gfx.wad`, `models/scientist.mdl` and a six-face skybox, 7 MB of
+which 6.3 MB is already installed — and none of that may overwrite what the
+build put there. Because the engine adds `valve/` to the search path
+(`FS_AddGameHierarchy`), a map's `halflife.wad` or `city` skybox already
+resolves from the Half-Life half of the install.
+
+The BSP is checked before anything is copied: version 30 (GoldSrc) and at least
+one spawn point. That catches an HTML error page saved under a `.zip` name, and
+a map that would drop everyone into spectator. The worldspawn's `message` becomes
+the title in `maps.lst`.
+
+Installed 2026-09-01:
+
+| Map | Spawns | Hostages | Sky |
+| --- | --- | --- | --- |
+| `cs_mansion` | 20 | 3 | `city` |
+| `cs_deathmatch` | 12 | 2 | — |
+| `aim_ak-colt` | 36 | 0 | — |
+| `aim_map` | 32 | 0 | `des` |
+
+`aim_map` asks for the `des` skybox, which this install carries as
+`cstrike/gfx/env/Des*.tga` — capitalised. It resolves because macOS and Windows
+both use case-insensitive filesystems by default; on a case-sensitive volume, or
+on a Linux server built from these assets, that map would lose its sky.
+
+### Navigation meshes for the bots
+
+Map archives do not carry `maps/<map>.nav`, and without one the console prints
+`ERROR: Failed to load 'maps/<map>.nav' file navigation map!` at every map start
+and the CZ bots never join. The mesh has to be computed by the game:
+
+```sh
+make counter-strike-nav MAPS=cs_mansion
+```
+
+`mac/make-nav.sh` appends `sv_cheats 1` and `bot_nav_analyze` to
+`cstrike/listenserver.cfg` (which the engine execs *after* each map load — a
+`+bot_nav_analyze` on the command line runs during init and is dropped),
+launches the map, waits for the `.nav` to appear, then restores the config and
+copies the mesh into `~/Games/assets` so rebuilds keep it. The config is
+restored through an `EXIT` trap, so an interrupted run does not leave the
+analysis wired into every future map load.
+
+**It has to be run from a terminal.** `play.sh` passes `-console`, so the engine
+reads console commands from stdin; when stdin is not a tty it issues `quit` to
+itself about fifteen seconds in — the log shows `Issuing host shutdown due to
+reason "command"` — long before any analysis finishes. A background shell, a
+`nohup` or a CI job therefore fails in a way that looks like the analysis quietly
+doing nothing. The script refuses to start in that case rather than waste ten
+minutes. This is also why the engine cannot be driven headlessly for this: a
+`-dedicated` server registers no bot commands at all.
+
+Doing it by hand is the same two commands — launch `./play.sh +map <map>`, press
+`~`, then `sv_cheats 1` and `bot_nav_analyze`.
+
 ## Why not Wine (post-mortem, 2026-07-20)
 
 Every Wine variant on this machine crashes the GoldSrc engine a few seconds

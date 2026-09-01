@@ -39,6 +39,16 @@ YaPB. They use the maps/<map>.nav meshes shipped here. If the console warns that
 the navigation data is from a different version of the map, run bot_nav_analyze
 to regenerate it (takes a few minutes).
 
+A map added by hand arrives without a mesh, and the console then says "Failed to
+load 'maps/<map>.nav' file navigation map!" every time it loads: the bots sit
+the map out until one is built. Load the map, press ~ and run:
+
+  sv_cheats 1
+  bot_nav_analyze
+
+Leave it alone until it finishes; the .nav is written at the end and is picked
+up from then on.
+
 Moving this folder to another Mac
 ---------------------------------
 Copy it as a ZIP archive. Copying onto a FAT/exFAT drive loses the executable
