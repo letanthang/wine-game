@@ -1,6 +1,6 @@
 # Wine setup helpers. See README.md for details.
 
-.PHONY: install uninstall prefix counter-strike counter-strike-offline counter-strike-dedicated counter-strike-server counter-strike-windows counter-strike-standalone counter-strike-mac counter-strike-vendor counter-strike-add-map counter-strike-nav
+.PHONY: install uninstall prefix counter-strike counter-strike-offline counter-strike-dedicated counter-strike-server counter-strike-windows counter-strike-debian counter-strike-standalone counter-strike-mac counter-strike-vendor counter-strike-add-map counter-strike-nav
 
 # Install Wine (Gcenx build), winetricks, and PATH setup in one shot
 install:
@@ -122,6 +122,20 @@ counter-strike-vendor:
 counter-strike-windows:
 	games/counter-strike/windows/build.sh --force \
 		$(if $(SLIM),--slim) $(if $(ZIP),--zip) $(if $(REFRESH),--refresh) $(ARGS)
+
+# Assemble a portable Debian (Linux) build of CS 1.6 on Xash3D into
+# ~/Games/cs16-debian. Copy the tarball to a Debian machine, unpack it and run
+# ./play.sh — no installer. Built on this Mac; nothing here calls apt.
+# Usage:
+#   make counter-strike-debian                 # amd64 package, ~877 MB
+#   make counter-strike-debian TAR=1           # plus ~/Games/cs16-debian.tar.gz
+#   make counter-strike-debian ARCH=i386       # 32-bit package
+#   make counter-strike-debian SLIM=1 TAR=1    # without the Half-Life valve/ assets
+# See games/counter-strike/debian/README.md.
+counter-strike-debian:
+	games/counter-strike/debian/build.sh --force \
+		$(if $(ARCH),--arch $(ARCH)) \
+		$(if $(SLIM),--slim) $(if $(TAR),--tar) $(if $(REFRESH),--refresh) $(ARGS)
 
 # Create a 64-bit Wine prefix for a game under ~/wine-prefixes/<GAME>.
 # Usage:

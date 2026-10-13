@@ -316,6 +316,20 @@ running well on Windows 2026-08-01. Details,
 including why it must be 32-bit and why `liblist.gam` points at `dlls\mp.dll`
 there instead of `dlls\cs.dll`: [`windows/README.md`](windows/README.md).
 
+## Portable Debian build
+
+The Linux binaries exist too (amd64 and i386, no arm64 client), so the same
+folder can be packaged for a Debian machine:
+
+```sh
+make counter-strike-debian TAR=1      # ~/Games/cs16-debian{,.tar.gz}
+```
+
+Unpack the tarball there and run `./play.sh`, which checks for the one system
+library the package needs (`libfreetype6`) and prints the `apt install` line if
+it is missing. Assembled and inspected on this Mac 2026-10-13, **not yet run on
+Debian**. Details: [`debian/README.md`](debian/README.md).
+
 ## Dedicated server
 
 ### Xash3D's own `-dedicated` mode
