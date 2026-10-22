@@ -197,6 +197,12 @@ info "Pointing liblist.gam at the CS16Client game module"
 perl -0pi -e 's/^gamedll\s+"[^"]*"/gamedll "dlls\\cs.dll"/m' "$LIBLIST"
 grep -q 'gamedll "dlls\\cs.dll"' "$LIBLIST" || die "failed to rewrite gamedll in ${LIBLIST}"
 
+# First-run key bindings: config.cfg is excluded from the asset copy, and
+# without one the engine starts on Half-Life's built-in bindings instead of
+# CS's (no buy menu on B, no team menu on M). See default-config.sh.
+info "Writing default key bindings to cstrike/config.cfg"
+"${REPO_GAME_DIR}/default-config.sh" "$OUT_DIR"
+
 # Downloaded archives carry the quarantine flag, and Gatekeeper kills unsigned
 # binaries that still have it with no useful message. The same script is
 # installed into the game folder, for when it is copied to another Mac.

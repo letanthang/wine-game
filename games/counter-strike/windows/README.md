@@ -60,6 +60,8 @@ binaries run fine on 64-bit Windows.
 6. Installs this repo's `bots.cfg` and makes `listenserver.cfg` exec it.
 7. Writes `play.bat`, `play-offline.bat`, `dedicated-server.bat`, a player-facing
    `README.txt`, and a `BUILD_INFO.txt` recording the SHA-256 of both archives.
+8. Copies [`README-ARM.md`](README-ARM.md) into the package (CRLF), the
+   Windows on ARM guide described below.
 
 Deliberately **excluded** from the asset copy: `*.dylib` and `SDL2.framework`
 (macOS binaries), `addons/` (Metamod / AMX Mod X / dproto — none of them load
@@ -94,6 +96,22 @@ the closing quote rather than to end-of-line, leaving the `\r` intact.
   missing-DLL error.
 - Do not unpack into `C:\Program Files` — the engine writes configs and
   screenshots next to the executable. `C:\Games\cs16` is a good spot.
+
+## Windows on ARM (Surface Pro X)
+
+The package runs on ARM devices through Windows' x86 emulation, and on a Surface
+Pro X it was reported as not very smooth (2026-10-14). There is no native ARM64
+build to switch to: neither upstream publishes one, and a native build was
+measured *slower* there because OpenGL, not the CPU, is the bottleneck
+([FWGS/xash3d-fwgs#845](https://github.com/FWGS/xash3d-fwgs/issues/845)).
+
+[`README-ARM.md`](README-ARM.md), shipped inside the package, walks through the
+fix: read `GL_RENDERER` from `engine.log` (`play.bat -dev 2 -log`); if it says
+`GDI Generic` the game is software-rendered, and Microsoft's **OpenCL, OpenGL &
+Vulkan Compatibility Pack** (Store `9NQPSL29BFFF`, or
+`winget install --id Microsoft.OpenCLGLVulkanCompatibilityPack`) maps OpenGL
+onto the Direct3D 12 driver. Lower resolution and `-ref soft` are the fallbacks.
+Not yet verified on the device.
 
 ## Limits carried over from the macOS build
 

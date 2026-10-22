@@ -208,6 +208,12 @@ info "Pointing liblist.gam at the CS16Client game module"
 perl -0pi -e 's/^gamedll\s+"[^"]*"/gamedll "dlls\\cs.dll"/m; s/^gamedll_linux\s+"[^"]*"/gamedll_linux "dlls\/cs.so"/m' "$LIBLIST"
 grep -q 'gamedll "dlls\\cs.dll"' "$LIBLIST" || die "failed to rewrite gamedll in ${LIBLIST}"
 
+# First-run key bindings: config.cfg is excluded from the asset copy, and
+# without one the engine starts on Half-Life's built-in bindings instead of
+# CS's (no buy menu on B, no team menu on M). See default-config.sh.
+info "Writing default key bindings to cstrike/config.cfg"
+"${REPO_GAME_DIR}/default-config.sh" "$OUT_DIR"
+
 # Bots: same mechanism as the other builds — the repo's bots.cfg is the source
 # of truth and listenserver.cfg execs it on every map start.
 info "Installing bots.cfg"

@@ -486,6 +486,25 @@ project uses.
 
 ## Troubleshooting
 
+### Controls are not the CS defaults on a fresh build
+
+Symptom (reported on the Debian build, 2026-10-19): on first start B does not
+open the buy menu, M does not open the team menu, and Options > Controls only
+looks right after pressing "Use defaults".
+
+Cause: every build excludes `cstrike/config.cfg` from the asset copy, since it
+is local state. CS keeps its bindings there, `valve.rc`'s `exec default.cfg` is
+commented out, and the install ships no `default.cfg` — so the engine started on
+its built-in Half-Life bindings.
+
+Fix: [`default-config.sh`](default-config.sh), called by the mac, windows and
+debian `build.sh`, writes a first-run `config.cfg` from
+`cstrike/gfx/shell/kb_def.lst`, which is the same list "Use defaults" reads. It
+never overwrites an existing `config.cfg`, and the engine rewrites the file on
+exit as usual. Its output matches the config the engine saved on this Mac after
+"Use defaults", apart from the gamepad-only `START` binding the engine adds
+itself.
+
 ### "Create Server" is greyed out in the LAN menu
 
 The WaRzOnE build's `cstrike/liblist.gam` points `gamedll` at

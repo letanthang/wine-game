@@ -177,6 +177,12 @@ else
   die "cstrike/liblist.gam is missing from the source install"
 fi
 
+# First-run key bindings: config.cfg is excluded from the asset copy, and
+# without one the engine starts on Half-Life's built-in bindings instead of
+# CS's (no buy menu on B, no team menu on M). See default-config.sh.
+info "Writing default key bindings to cstrike/config.cfg"
+"${REPO_GAME_DIR}/default-config.sh" "$OUT_DIR"
+
 # Bots: same mechanism as the macOS launcher — the repo's bots.cfg is the source
 # of truth and listenserver.cfg execs it on every map start.
 info "Installing bots.cfg"
@@ -276,9 +282,22 @@ Notes
   servers, but servers with strict anti-cheat may reject a non-GoldSrc client.
 * Configs are generated on first run, so the first start is the slow one.
 
+Windows on ARM (Surface Pro X and similar)
+------------------------------------------
+The game runs there through x86 emulation. If it stutters, see README-ARM.md:
+it shows how to check the OpenGL renderer and how to get GPU acceleration with
+Microsoft's OpenCL, OpenGL & Vulkan Compatibility Pack.
+
 See BUILD_INFO.txt for exactly which engine and client builds this package was
 assembled from.
 EOF
+
+# Windows on ARM notes (Surface Pro X): how to check which OpenGL renderer the
+# emulated x86 build ends up on and how to get it GPU-accelerated. CRLF like the
+# other text files in the package.
+info "Installing README-ARM.md"
+[[ -f "${SCRIPT_DIR}/README-ARM.md" ]] || die "README-ARM.md is missing next to this script"
+write_crlf "$OUT_DIR/README-ARM.md" < "${SCRIPT_DIR}/README-ARM.md"
 
 info "Writing BUILD_INFO.txt"
 {
@@ -303,7 +322,11 @@ if (( MAKE_ZIP )); then
   ZIP_PATH="${OUT_DIR}.zip"
   info "Zipping to ${ZIP_PATH}"
   rm -f "$ZIP_PATH"
-  (cd "${OUT_DIR:h}" && zip -qr9 "${ZIP_PATH:t}" "${OUT_DIR:t}" -x '*.DS_Store')
+  # Info-ZIP reads default options from the ZIP and ZIPOPT environment
+  # variables, and `make counter-strike-windows ZIP=1` exports ZIP=1: zip then
+  # took "1" as the archive name and silently wrote 1.zip instead.
+  (cd "${OUT_DIR:h}" && env -u ZIP -u ZIPOPT zip -qr9 "${ZIP_PATH:t}" "${OUT_DIR:t}" -x '*.DS_Store')
+  [[ -s "$ZIP_PATH" ]] || die "zip did not produce ${ZIP_PATH}"
 fi
 
 info "Done: ${OUT_DIR} ($(du -sh "$OUT_DIR" | cut -f1))"
